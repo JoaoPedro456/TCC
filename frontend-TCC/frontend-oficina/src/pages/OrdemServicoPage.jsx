@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../services/api';
-import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Wrench, Printer, Search, AlertTriangle } from 'lucide-react';
+import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
 
 const STATUS_CONFIG = {
@@ -24,12 +24,15 @@ export function OrdemServicoPage() {
   const servicosPorPagina = 8;
   const { success, error } = useToast();
 
+  // --- ATUALIZAÇÃO DO ESTADO INICIAL ---
   const formInicial = {
     clienteId: '',
     observacao: '',
-    quilometragem: '',
     veiculo: '',
-    valorTotal: '',
+    quilometragem: '',
+    valorKm: '',      // Preço cobrado por KM
+    valorServico: '', // Preço cobrado pela mão de obra/peças
+    valorTotal: 0,    // Calculado automaticamente
     itensServicoIds: [],
     mecanicos: [],
   };
@@ -56,6 +59,22 @@ export function OrdemServicoPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // --- NOVA FUNÇÃO MAGICA DE CALCULO ---
+  // Atualiza um campo e recalcula o total imediatamente
+  const atualizarCampoMagico = (campo, valor) => {
+    setForm(prev => {
+      const newState = { ...prev, [campo]: valor };
+      
+      const servico = parseFloat(newState.valorServico) || 0;
+      const km = parseFloat(newState.quilometragem) || 0;
+      const precoKm = parseFloat(newState.valorKm) || 0;
+      
+      // O Total é a soma do Serviço + Custo da Viagem
+      newState.valorTotal = (servico + (km * precoKm)).toFixed(2);
+      return newState;
+    });
+  };
+
   const toggleMecanico = (id) => {
     const func = funcionarios.find(f => f.id === id);
     setForm(prev => {
@@ -73,11 +92,24 @@ export function OrdemServicoPage() {
       const novosIds = jatem
         ? prev.itensServicoIds.filter(i => i !== id)
         : [...prev.itensServicoIds, id];
-      const novoValor = novosIds.reduce((acc, sid) => {
+      
+      // Quando seleciona um serviço do catálogo, ele soma todos e joga no "valorServico"
+      const novoValorCat = novosIds.reduce((acc, sid) => {
         const s = servicos.find(sv => sv.id === sid);
         return acc + Number(s?.precoTabela || 0);
       }, 0);
-      return { ...prev, itensServicoIds: novosIds, valorTotal: novoValor.toFixed(2) };
+
+      // Recalcula o total com a nova soma do catálogo
+      const km = parseFloat(prev.quilometragem) || 0;
+      const precoKm = parseFloat(prev.valorKm) || 0;
+      const totalRecalculado = (novoValorCat + (km * precoKm)).toFixed(2);
+
+      return { 
+        ...prev, 
+        itensServicoIds: novosIds, 
+        valorServico: novoValorCat.toFixed(2), // Preenche o input do serviço automaticamente
+        valorTotal: totalRecalculado 
+      };
     });
   };
 
@@ -87,9 +119,9 @@ export function OrdemServicoPage() {
       error('Selecione um cliente.');
       return;
     }
-    const valor = Number(form.valorTotal);
-    if (isNaN(valor) || valor <= 0) {
-      error('Informe um valor total valido (maior que zero).');
+    const total = Number(form.valorTotal);
+    if (isNaN(total) || total <= 0) {
+      error('Informe valores válidos para o serviço ou quilometragem.');
       return;
     }
     setSubmitting(true);
@@ -97,13 +129,12 @@ export function OrdemServicoPage() {
       const payload = {
         cliente: { id: Number(form.clienteId) },
         observacao: form.observacao,
-        quilometragem: form.quilometragem ? Number(form.quilometragem) : null,
         veiculo: form.veiculo || null,
-        valorTotal: valor,
+        quilometragem: form.quilometragem ? Number(form.quilometragem) : null,
+        valorKm: form.valorKm ? Number(form.valorKm) : null, // Envia o valor do KM
+        valorTotal: total,
         itensServicoIds: form.itensServicoIds,
-        mecanicos: form.mecanicos.map(m => ({
-          mecanico: { id: m.mecanicoId },
-        })),
+        mecanicos: form.mecanicos.map(m => ({ mecanico: { id: m.mecanicoId } })),
       };
       await api.post('/ordens', payload);
       setModalAberto(false);
@@ -112,13 +143,8 @@ export function OrdemServicoPage() {
       success('Ordem de Serviço criada com sucesso!');
     } catch (err) {
       console.error('Erro ao salvar OS', err);
-      const msg = err.response?.data?.erro || err.response?.data?.message || err.message || 'Erro ao salvar a OS.';
-      if (err.response?.data?.campos) {
-        const campos = err.response.data.campos.map(c => c.mensagem).join(', ');
-        error(campos);
-      } else {
-        error(msg);
-      }
+      const msg = err.response?.data?.erro || 'Erro ao salvar a OS.';
+      error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -158,7 +184,6 @@ export function OrdemServicoPage() {
       window.URL.revokeObjectURL(url);
       success('PDF baixado!');
     } catch {
-      console.error('Erro ao gerar PDF');
       error('Erro ao gerar o PDF da OS.');
     }
   };
@@ -186,10 +211,7 @@ export function OrdemServicoPage() {
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Ordens de Serviço</h2>
           <p className="text-slate-500 text-sm mt-1">{ordens.length} ordens registradas</p>
         </div>
-        <button
-          onClick={() => setModalAberto(true)}
-          className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 shadow-lg transition"
-        >
+        <button onClick={() => setModalAberto(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 shadow-lg transition">
           <Plus size={18} /> Nova OS
         </button>
       </div>
@@ -207,15 +229,7 @@ export function OrdemServicoPage() {
           />
         </div>
         {['TODOS', 'ABERTA', 'CONCLUIDA', 'CANCELADA'].map(s => (
-          <button
-            key={s}
-            onClick={() => setFiltroStatus(s)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap ${
-              filtroStatus === s
-                ? 'bg-slate-900 text-white'
-                : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
-            }`}
-          >
+          <button key={s} onClick={() => setFiltroStatus(s)} className={`px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap ${filtroStatus === s ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'}`}>
             {s === 'TODOS' ? 'Todos' : STATUS_CONFIG[s]?.label}
           </button>
         ))}
@@ -234,7 +248,6 @@ export function OrdemServicoPage() {
           return (
             <div key={os.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
               <div className="flex items-start gap-4">
-                {/* Esquerda: info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-slate-400 text-sm font-mono">#{String(os.id).padStart(4, '0')}</span>
@@ -247,48 +260,23 @@ export function OrdemServicoPage() {
                   <p className="text-slate-500 text-sm mt-0.5 truncate">{os.observacao}</p>
                   {(os.quilometragem || os.veiculo) && (
                     <p className="text-slate-400 text-xs mt-1.5 flex gap-3">
-                      {os.quilometragem && <span>{os.quilometragem} km</span>}
                       {os.veiculo && <span>🚗 {os.veiculo}</span>}
+                      {os.quilometragem && <span>🛤️ {os.quilometragem} km</span>}
                     </p>
                   )}
-                  {os.mecanicos?.length > 0 && (
-                    <div className="flex gap-1.5 mt-2.5 flex-wrap">
-                      {os.mecanicos.map(m => (
-                        <span key={m.id} className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-md font-medium">
-                          🔧 {m.mecanico?.nome}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
-                {/* Direita: valor + ações */}
                 <div className="text-right shrink-0">
-                  <p className="text-xl font-black text-slate-900">
-                    R$ {Number(os.valorTotal || 0).toFixed(2)}
-                  </p>
+                  <p className="text-xl font-black text-slate-900">R$ {Number(os.valorTotal || 0).toFixed(2)}</p>
                   <div className="flex items-center gap-1 mt-2 justify-end">
-                    <select
-                      value={os.status || 'ABERTA'}
-                      onChange={e => atualizarStatus(os.id, e.target.value)}
-                      className="text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 cursor-pointer outline-none focus:border-slate-400"
-                    >
+                    <select value={os.status || 'ABERTA'} onChange={e => atualizarStatus(os.id, e.target.value)} className="text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 cursor-pointer outline-none focus:border-slate-400">
                       <option value="ABERTA">Aberta</option>
                       <option value="CONCLUIDA">Concluída</option>
                       <option value="CANCELADA">Cancelada</option>
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => baixarPdf(os.id)}
-                      className="text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1.5 transition"
-                      title="Baixar PDF"
-                    >
+                    <button type="button" onClick={() => baixarPdf(os.id)} className="text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1.5 transition" title="Baixar PDF">
                       <Printer size={14} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => excluir(os.id)}
-                      className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition"
-                    >
+                    <button type="button" onClick={() => excluir(os.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -303,7 +291,6 @@ export function OrdemServicoPage() {
       {modalAberto && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-[4px]">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-[70%] max-h-[90vh] overflow-y-auto">
-            {/* Modal header */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
               <div>
                 <h3 className="text-[30px] font-bold text-slate-900">Nova Ordem de Serviço</h3>
@@ -315,143 +302,135 @@ export function OrdemServicoPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              {/* Cliente */}
-              <div>
-                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Cliente</label>
-                <select
-                  className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition bg-white"
-                  value={form.clienteId}
-                  onChange={e => setForm({ ...form, clienteId: e.target.value })}
-                  required
-                >
-                  <option value="">Selecione o cliente</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome} {c.cpf ? `- CPF: ${c.cpf}` : ''}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Veículo */}
-              <div>
-                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Veículo / Maquinário</label>
-                <input
-                  placeholder="Ex: Trator/Implemento"
-                  className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-                  value={form.veiculo}
-                  onChange={e => setForm({ ...form, veiculo: e.target.value })}
-                />
-              </div>
-
-              {/* Quilometragem */}
-              <div>
-                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Quilometragem</label>
-                <input
-                  type="number"
-                  placeholder="Opicional*"
-                  className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-                  value={form.quilometragem}
-                  onChange={e => setForm({ ...form, quilometragem: e.target.value })}
-                />
+              
+              {/* Linha 1: Cliente e Veículo */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Cliente *</label>
+                  <select
+                    className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition bg-white"
+                    value={form.clienteId}
+                    onChange={e => atualizarCampoMagico('clienteId', e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione o cliente</option>
+                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nome} {c.cpf ? `- CPF: ${c.cpf}` : ''}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Veículo / Maquinário</label>
+                  <input
+                    placeholder="Ex: Trator/Implemento"
+                    className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    value={form.veiculo}
+                    onChange={e => atualizarCampoMagico('veiculo', e.target.value)}
+                  />
+                </div>
               </div>
 
               {/* Descrição */}
               <div>
-                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Descrição do serviço</label>
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Descrição do serviço *</label>
                 <textarea
                   placeholder="Descreva o que foi realizado: troca de óleo, revisão dos freios, etc."
                   className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 resize-none transition"
                   rows={3}
                   value={form.observacao}
-                  onChange={e => setForm({ ...form, observacao: e.target.value })}
+                  onChange={e => atualizarCampoMagico('observacao', e.target.value)}
                   required
                 />
               </div>
 
-              {/* Serviços (opcional) */}
+              {/* Serviços do catálogo */}
               <div>
                 <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">
                   Serviços do catálogo <span className="text-slate-400 font-normal">(opcional)</span>
                 </label>
-                {/* Busca de serviços */}
                 <input
                   type="text"
                   placeholder="Buscar serviço no catálogo..."
                   value={buscaServico}
-                  onChange={e => {
-                    setBuscaServico(e.target.value);
-                    setPaginaServicos(1);
-                  }}
+                  onChange={e => { setBuscaServico(e.target.value); setPaginaServicos(1); }}
                   className="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition mb-2"
                 />
-                {/* Lista paginada */}
                 <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1">
-                  {servicos
-                    .filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase()))
-                    .slice((paginaServicos - 1) * servicosPorPagina, paginaServicos * servicosPorPagina)
-                    .map(s => {
-                      const selecionado = form.itensServicoIds.includes(s.id);
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => toggleServico(s.id)}
-                          className={`p-3 rounded-lg border text-left transition ${
-                            selecionado
-                              ? 'border-blue-600 bg-blue-50 text-blue-700'
-                              : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                          }`}
-                        >
-                          <p className="font-medium text-sm">{s.nomeServico}</p>
-                          <p className="text-xs mt-0.5 text-slate-400">R$ {Number(s.precoTabela || 0).toFixed(2)}</p>
-                        </button>
-                      );
-                    })}
+                  {servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).slice((paginaServicos - 1) * servicosPorPagina, paginaServicos * servicosPorPagina).map(s => {
+                    const selecionado = form.itensServicoIds.includes(s.id);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => toggleServico(s.id)}
+                        className={`p-3 rounded-lg border text-left transition ${selecionado ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                      >
+                        <p className="font-medium text-sm">{s.nomeServico}</p>
+                        <p className="text-xs mt-0.5 text-slate-400">R$ {Number(s.precoTabela || 0).toFixed(2)}</p>
+                      </button>
+                    );
+                  })}
                 </div>
-                {/* Paginação */}
-                {servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).length > servicosPorPagina && (
-                  <div className="flex items-center justify-center gap-2 mt-2">
-                    <button
-                      onClick={() => setPaginaServicos(p => Math.max(1, p - 1))}
-                      disabled={paginaServicos === 1}
-                      className="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Anterior
-                    </button>
-                    <span className="text-xs text-slate-500">
-                      Página {paginaServicos} de {Math.ceil(servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).length / servicosPorPagina)}
-                    </span>
-                    <button
-                      onClick={() => setPaginaServicos(p => Math.min(Math.ceil(servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).length / servicosPorPagina), p + 1))}
-                      disabled={paginaServicos >= Math.ceil(servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).length / servicosPorPagina)}
-                      className="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Próxima
-                    </button>
-                  </div>
-                )}
-                {form.itensServicoIds.length > 0 && (
-                  <p className="text-xs text-slate-500 mt-2">
-                    {form.itensServicoIds.length} serviço(s) selecionado(s)
-                  </p>
-                )}
               </div>
 
-              {/* Valor */}
-              <div>
-                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Valor Total</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    className="w-full border border-slate-200 pl-10 pr-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-                    value={form.valorTotal}
-                    onChange={e => setForm({ ...form, valorTotal: e.target.value })}
-                    required
-                  />
+              {/* --- NOVA ÁREA FINANCEIRA --- */}
+              <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+                <h4 className="text-sm font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">Detalhes Financeiros</h4>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  
+                  {/* Bloco Valor do Serviço */}
+                  <div>
+                    <label className="text-[12px] font-semibold text-slate-700 block mb-1">Valor dos Serviços</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
+                      <input
+                        type="number" step="0.01" placeholder="0.00"
+                        className="w-full border border-slate-200 pl-9 pr-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                        value={form.valorServico}
+                        onChange={e => atualizarCampoMagico('valorServico', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bloco Quilometragem */}
+                  <div>
+                    <label className="text-[12px] font-semibold text-slate-700 block mb-1">Distância</label>
+                    <div className="relative">
+                      <input
+                        type="number" step="0.1" placeholder="Ex: 30"
+                        className="w-full border border-slate-200 px-3 pr-10 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                        value={form.quilometragem}
+                        onChange={e => atualizarCampoMagico('quilometragem', e.target.value)}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">km</span>
+                    </div>
+                  </div>
+
+                  {/* Bloco Valor por KM */}
+                  <div>
+                    <label className="text-[12px] font-semibold text-slate-700 block mb-1">Custo por KM</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
+                      <input
+                        type="number" step="0.01" placeholder="2.50"
+                        className="w-full border border-slate-200 pl-9 pr-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                        value={form.valorKm}
+                        onChange={e => atualizarCampoMagico('valorKm', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Totalizador (Somente Leitura) */}
+                <div className="bg-slate-900 p-4 rounded-lg flex justify-between items-center">
+                  <div>
+                    <p className="text-white text-sm font-semibold uppercase tracking-wider">Total a Pagar</p>
+                    <p className="text-slate-400 text-xs mt-0.5">Serviços + (Distância x Custo KM)</p>
+                  </div>
+                  <p className="text-3xl font-black text-white">
+                    R$ {Number(form.valorTotal || 0).toFixed(2)}
+                  </p>
                 </div>
               </div>
+              {/* ---------------------------- */}
 
               {/* Mecânicos */}
               <div>
@@ -461,14 +440,8 @@ export function OrdemServicoPage() {
                     const selecionado = form.mecanicos.some(m => m.mecanicoId === f.id);
                     return (
                       <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => toggleMecanico(f.id)}
-                        className={`p-3 rounded-lg border text-left transition ${
-                          selecionado
-                            ? 'border-blue-600 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                        }`}
+                        key={f.id} type="button" onClick={() => toggleMecanico(f.id)}
+                        className={`p-3 rounded-lg border text-left transition ${selecionado ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
                       >
                         <p className="font-medium text-sm">{f.nome}</p>
                         <p className="text-xs mt-0.5 text-slate-400">{f.cargo || '—'} • {f.percentualComissao || 0}%</p>
@@ -480,21 +453,11 @@ export function OrdemServicoPage() {
 
               {/* Botões */}
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setModalAberto(false); setForm(formInicial); }}
-                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 transition"
-                >
+                <button type="button" onClick={() => { setModalAberto(false); setForm(formInicial); }} className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 transition">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 px-4 py-3 bg-slate-900 text-white font-semibold rounded-lg hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                  ) : 'Criar OS'}
+                <button type="submit" disabled={submitting} className="flex-1 px-4 py-3 bg-slate-900 text-white font-semibold rounded-lg hover:bg-slate-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                  {submitting ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : 'Criar OS'}
                 </button>
               </div>
             </form>
