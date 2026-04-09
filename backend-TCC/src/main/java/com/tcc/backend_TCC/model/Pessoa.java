@@ -15,10 +15,14 @@ public class Pessoa {
     @Size(min = 2, max = 200, message = "Nome deve ter entre 2 e 200 caracteres")
     private String nome;
 
+    // Adicionado: unique = true proíbe telefones repetidos no banco
+    @Column(unique = true)
     @Size(max = 20, message = "Telefone deve ter no máximo 20 caracteres")
     @Pattern(regexp = "^[0-9\\-\\+\\(\\) ]*$", message = "Telefone contém caracteres inválidos")
     private String telefone;
 
+    // Adicionado: unique = true proíbe CPFs repetidos no banco
+    @Column(unique = true)
     @Size(max = 14, message = "CPF deve ter no máximo 14 caracteres")
     @Pattern(regexp = "^[0-9\\-\\.]*$", message = "CPF deve conter apenas números, traços e pontos")
     private String cpf;
