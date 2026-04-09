@@ -17,6 +17,24 @@ export function PessoaPage() {
   
   const { success, error } = useToast();
 
+  // 1. Funções de formatação (Máscaras)
+  const formatarCPF = (valor) => {
+    return valor
+      .replace(/\D/g, '') // Remove tudo o que não é número
+      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca ponto entre o 3º e o 4º dígito
+      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca ponto entre o 6º e o 7º dígito
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2') // Coloca hífen entre o 9º e o 10º dígito
+      .replace(/(-\d{2})\d+?$/, '$1'); // Impede a digitação de mais de 14 caracteres
+  };
+
+  const formatarTelefone = (valor) => {
+    return valor
+      .replace(/\D/g, '') // Remove tudo o que não é número
+      .replace(/(\d{2})(\d)/, '($1) $2') // Coloca parênteses no DDD
+      .replace(/(\d{4,5})(\d{4})/, '$1-$2') // Coloca hífen
+      .replace(/(-\d{4})\d+?$/, '$1'); // Impede a digitação de mais de 15 caracteres
+  };
+
   const carregar = async () => {
     try {
       const res = await api.get('/pessoa');
@@ -78,7 +96,8 @@ export function PessoaPage() {
       await carregar(); 
     } catch (err) {
       console.error('Erro ao salvar:', err.response || err);
-      const msg = err.response?.data?.erro || 'Erro ao salvar. Verifique a conexão.';
+      // 2. Melhoria na captura de erro: mostra a mensagem exata do backend
+      const msg = err.response?.data?.erro || err.response?.data?.message || 'Erro ao salvar. Verifique se o CPF/Telefone já existem.';
       error(msg);
     } finally {
       setLoading(false);
@@ -222,17 +241,20 @@ export function PessoaPage() {
               />
               
               <div className="grid grid-cols-2 gap-3">
+                {/* 3. Inputs com formatação aplicada em tempo real e maxLength */}
                 <input 
                   placeholder="Telefone" 
                   value={formData.telefone}
+                  maxLength="15"
                   className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-                  onChange={e => setFormData({ ...formData, telefone: e.target.value })} 
+                  onChange={e => setFormData({ ...formData, telefone: formatarTelefone(e.target.value) })} 
                 />
                 <input 
                   placeholder="CPF" 
                   value={formData.cpf}
+                  maxLength="14"
                   className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-                  onChange={e => setFormData({ ...formData, cpf: e.target.value })} 
+                  onChange={e => setFormData({ ...formData, cpf: formatarCPF(e.target.value) })} 
                 />
               </div>
 
