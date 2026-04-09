@@ -26,7 +26,8 @@ public class AuthService {
             throw new RuntimeException("Senha incorreta");
         }
 
-        return jwtService.gerarToken(login);
+        // Passa a role do usuário para incluir no token
+        return jwtService.gerarToken(login, usuario.getRole());
     }
 
     public Usuario registrar(String login, String senha, String role) {

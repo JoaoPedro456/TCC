@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -32,8 +33,13 @@ public class JwtFilter extends OncePerRequestFilter {
             String token = authHeader.substring(7);
             if (jwtService.tokenValido(token)) {
                 String login = jwtService.extrairLogin(token);
+                String role = jwtService.extrairRole(token);
+// Se no banco estiver "ADMIN", aqui vira "ROLE_ADMIN"
+                String authority = "ROLE_" + (role != null ? role.toUpperCase() : "OPERADOR");
+                List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(authority));
+
                 UsernamePasswordAuthenticationToken auth =
-                        new UsernamePasswordAuthenticationToken(login, null, List.of());
+                        new UsernamePasswordAuthenticationToken(login, null, authorities);
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }

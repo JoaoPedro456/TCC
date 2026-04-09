@@ -3,7 +3,10 @@ package com.tcc.backend_TCC.controller;
 import com.tcc.backend_TCC.model.Pessoa;
 import com.tcc.backend_TCC.model.TipoPessoa;
 import com.tcc.backend_TCC.service.PessoaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,17 +34,18 @@ public class PessoaController {
     }
 
     @PostMapping
-    public Pessoa criar(@RequestBody Pessoa p) {
-        return service.salvar(p);
+    public ResponseEntity<Pessoa> criar(@Valid @RequestBody Pessoa p) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.salvar(p));
     }
 
     @PutMapping("/{id}")
-    public Pessoa atualizar(@PathVariable Long id, @RequestBody Pessoa p) {
+    public Pessoa atualizar(@PathVariable Long id, @Valid @RequestBody Pessoa p) {
         return service.atualizar(id, p);
     }
 
     @DeleteMapping("/{id}")
-    public void excluir(@PathVariable Long id) {
+    public ResponseEntity<Void> excluir(@PathVariable Long id) {
         service.excluir(id);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -15,6 +15,15 @@ public interface OrdemServicoMecanicoRepository extends JpaRepository<OrdemServi
 
     List<OrdemServicoMecanico> findByMecanicoId(Long mecanicoId);
 
+    @Query("SELECT COUNT(m) FROM OrdemServicoMecanico m " +
+            "WHERE m.mecanico.id = :mecanicoId " +
+            "AND m.ordemServico.dataRegisto BETWEEN :inicio AND :fim")
+    long contarOSPormecanicoEPeriodo(
+            @Param("mecanicoId") Long mecanicoId,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim
+    );
+
     @Query("SELECT COALESCE(SUM(m.valorComissao), 0) FROM OrdemServicoMecanico m " +
             "WHERE m.mecanico.id = :mecanicoId " +
             "AND m.ordemServico.dataRegisto BETWEEN :inicio AND :fim")

@@ -25,7 +25,8 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
 
     // Corrigido: valorServico → valorTotal
     @Query("SELECT COALESCE(SUM(os.valorTotal), 0) FROM OrdemServico os " +
-            "WHERE os.dataRegisto BETWEEN :inicio AND :fim")
+            "WHERE os.dataRegisto BETWEEN :inicio AND :fim " +
+            "AND os.status = 'CONCLUIDA'")
     BigDecimal totalFaturadoPorPeriodo(
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim

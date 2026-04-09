@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import api from '../services/api';
-import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Wrench, ChevronDown } from 'lucide-react';
+import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Wrench, Printer, Search, AlertTriangle } from 'lucide-react';
+import { useToast } from '../components/ToastProvider.jsx';
 
 const STATUS_CONFIG = {
-  ABERTA: { label: 'Aberta', color: 'bg-blue-100 text-blue-700', icon: <Clock size={12} /> },
-  EM_SERVICO: { label: 'Em Serviço', color: 'bg-orange-100 text-orange-700', icon: <Wrench size={12} /> },
-  CONCLUIDA: { label: 'Concluída', color: 'bg-green-100 text-green-700', icon: <CheckCircle size={12} /> },
-  CANCELADA: { label: 'Cancelada', color: 'bg-red-100 text-red-700', icon: <XCircle size={12} /> },
+  ABERTA: { label: 'Aberta', color: 'bg-blue-500/20 text-blue-400 border border-blue-500/30', icon: <Clock size={12} /> },
+  CONCLUIDA: { label: 'Concluída', color: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', icon: <CheckCircle size={12} /> },
+  CANCELADA: { label: 'Cancelada', color: 'bg-red-500/20 text-red-400 border border-red-500/30', icon: <XCircle size={12} /> },
 };
 
 export function OrdemServicoPage() {
@@ -16,20 +16,26 @@ export function OrdemServicoPage() {
   const [servicos, setServicos] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState('TODOS');
+  const [busca, setBusca] = useState('');
+  const [buscaServico, setBuscaServico] = useState('');
+  const [paginaServicos, setPaginaServicos] = useState(1);
+  const servicosPorPagina = 8;
+  const { success, error } = useToast();
 
   const formInicial = {
     clienteId: '',
     observacao: '',
     quilometragem: '',
+    veiculo: '',
     valorTotal: '',
     itensServicoIds: [],
     mecanicos: [],
   };
   const [form, setForm] = useState(formInicial);
-  const [mecanicoSelecionado, setMecanicoSelecionado] = useState({ id: '', valor: '' });
 
-  const carregar = async () => {
+  const carregar = useCallback(async () => {
     try {
       const [resOrdens, resPessoas, resServicos] = await Promise.all([
         api.get('/ordens'),
@@ -42,37 +48,26 @@ export function OrdemServicoPage() {
       setServicos(resServicos.data);
     } catch (err) {
       console.error('Erro ao carregar dados', err);
+      error('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
-  };
+  }, [error]);
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => { carregar(); }, [carregar]);
 
-  const adicionarMecanico = () => {
-    if (!mecanicoSelecionado.id || !mecanicoSelecionado.valor) return;
-    const func = funcionarios.find(f => f.id === Number(mecanicoSelecionado.id));
-    if (!func) return;
-    if (form.mecanicos.find(m => m.mecanicoId === func.id)) return;
-    setForm(prev => ({
-      ...prev,
-      mecanicos: [...prev.mecanicos, {
-        mecanicoId: func.id,
-        nome: func.nome,
-        cargo: func.cargo,
-        percentual: func.percentualComissao,
-        valorAtribuido: Number(mecanicoSelecionado.valor),
-      }]
-    }));
-    setMecanicoSelecionado({ id: '', valor: '' });
-  };
-
-  const removerMecanico = (id) => {
-    setForm(prev => ({ ...prev, mecanicos: prev.mecanicos.filter(m => m.mecanicoId !== id) }));
+  const toggleMecanico = (id) => {
+    const func = funcionarios.find(f => f.id === id);
+    setForm(prev => {
+      const jatem = prev.mecanicos.find(m => m.mecanicoId === id);
+      if (jatem) {
+        return { ...prev, mecanicos: prev.mecanicos.filter(m => m.mecanicoId !== id) };
+      }
+      return { ...prev, mecanicos: [...prev.mecanicos, { mecanicoId: func.id, nome: func.nome, cargo: func.cargo }] };
+    });
   };
 
   const toggleServico = (id) => {
-    const srv = servicos.find(s => s.id === id);
     setForm(prev => {
       const jatem = prev.itensServicoIds.includes(id);
       const novosIds = jatem
@@ -88,43 +83,94 @@ export function OrdemServicoPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.clienteId) {
+      error('Selecione um cliente.');
+      return;
+    }
+    const valor = Number(form.valorTotal);
+    if (isNaN(valor) || valor <= 0) {
+      error('Informe um valor total valido (maior que zero).');
+      return;
+    }
+    setSubmitting(true);
     try {
       const payload = {
         cliente: { id: Number(form.clienteId) },
         observacao: form.observacao,
         quilometragem: form.quilometragem ? Number(form.quilometragem) : null,
-        valorTotal: Number(form.valorTotal),
-        itensServico: form.itensServicoIds.map(id => ({ id })),
+        veiculo: form.veiculo || null,
+        valorTotal: valor,
+        itensServicoIds: form.itensServicoIds,
         mecanicos: form.mecanicos.map(m => ({
           mecanico: { id: m.mecanicoId },
-          valorAtribuido: m.valorAtribuido,
         })),
       };
       await api.post('/ordens', payload);
       setModalAberto(false);
       setForm(formInicial);
-      carregar();
+      await carregar();
+      success('Ordem de Serviço criada com sucesso!');
     } catch (err) {
       console.error('Erro ao salvar OS', err);
-      alert('Erro ao salvar a OS. Verifique os dados.');
+      const msg = err.response?.data?.erro || err.response?.data?.message || err.message || 'Erro ao salvar a OS.';
+      if (err.response?.data?.campos) {
+        const campos = err.response.data.campos.map(c => c.mensagem).join(', ');
+        error(campos);
+      } else {
+        error(msg);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const atualizarStatus = async (id, status) => {
-    await api.put(`/ordens/${id}/status?status=${status}`);
-    carregar();
-  };
-
-  const excluir = async (id) => {
-    if (confirm('Excluir esta OS?')) {
-      await api.delete(`/ordens/${id}`);
-      carregar();
+    try {
+      await api.put(`/ordens/${id}/status?status=${status}`);
+      await carregar();
+      success('Status atualizado!');
+    } catch {
+      error('Erro ao atualizar status');
     }
   };
 
-  const ordensFiltradas = filtroStatus === 'TODOS'
-    ? ordens
-    : ordens.filter(o => o.status === filtroStatus);
+  const excluir = async (id) => {
+    if (!confirm('Excluir esta OS?')) return;
+    try {
+      await api.delete(`/ordens/${id}`);
+      await carregar();
+      success('OS excluída com sucesso!');
+    } catch {
+      error('Erro ao excluir OS');
+    }
+  };
+
+  const baixarPdf = async (id) => {
+    try {
+      const res = await api.get(`/ordens/${id}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `OS_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      success('PDF baixado!');
+    } catch {
+      console.error('Erro ao gerar PDF');
+      error('Erro ao gerar o PDF da OS.');
+    }
+  };
+
+  const ordensFiltradas = ordens.filter(o => {
+    const matchStatus = filtroStatus === 'TODOS' || o.status === filtroStatus;
+    const matchBusca = !busca ||
+      o.cliente?.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+      String(o.id).includes(busca) ||
+      (o.veiculo && o.veiculo.toLowerCase().includes(busca.toLowerCase()));
+    return matchStatus && matchBusca;
+  });
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -134,29 +180,40 @@ export function OrdemServicoPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      {/* Header */}
+      <div className="flex justify-between items-end flex-wrap gap-4 mb-8">
         <div>
-          <h2 className="text-3xl font-black text-slate-800">Ordens de Serviço</h2>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Ordens de Serviço</h2>
           <p className="text-slate-500 text-sm mt-1">{ordens.length} ordens registradas</p>
         </div>
         <button
           onClick={() => setModalAberto(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition"
+          className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 shadow-lg transition"
         >
-          <Plus size={20} /> Nova OS
+          <Plus size={18} /> Nova OS
         </button>
       </div>
 
-      {/* Filtro por status */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {['TODOS', 'ABERTA', 'EM_SERVICO', 'CONCLUIDA', 'CANCELADA'].map(s => (
+      {/* Barra de busca + Filtros */}
+      <div className="flex flex-wrap gap-3 items-center mb-6">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por cliente, nº da OS ou veículo..."
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-slate-900 transition"
+          />
+        </div>
+        {['TODOS', 'ABERTA', 'CONCLUIDA', 'CANCELADA'].map(s => (
           <button
             key={s}
             onClick={() => setFiltroStatus(s)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition ${
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap ${
               filtroStatus === s
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                ? 'bg-slate-900 text-white'
+                : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
             }`}
           >
             {s === 'TODOS' ? 'Todos' : STATUS_CONFIG[s]?.label}
@@ -165,9 +222,9 @@ export function OrdemServicoPage() {
       </div>
 
       {/* Lista de OS */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {ordensFiltradas.length === 0 && (
-          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+          <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
             <ClipboardList size={40} className="text-slate-300 mx-auto mb-3" />
             <p className="text-slate-400 font-medium">Nenhuma ordem encontrada</p>
           </div>
@@ -175,53 +232,64 @@ export function OrdemServicoPage() {
         {ordensFiltradas.map(os => {
           const st = STATUS_CONFIG[os.status] || STATUS_CONFIG.ABERTA;
           return (
-            <div key={os.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
+            <div key={os.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
+              <div className="flex items-start gap-4">
+                {/* Esquerda: info */}
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-slate-400 text-sm font-mono">#{String(os.id).padStart(4, '0')}</span>
-                    <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${st.color}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${st.color}`}>
                       {st.icon} {st.label}
                     </span>
                     <span className="text-slate-400 text-xs">{os.dataRegisto}</span>
                   </div>
-                  <h3 className="font-bold text-slate-800 text-lg">
-                    {os.cliente?.nome || 'Cliente não informado'}
-                  </h3>
-                  <p className="text-slate-500 text-sm mt-1">{os.observacao}</p>
-                  {os.quilometragem && (
-                    <p className="text-slate-400 text-xs mt-1">📍 {os.quilometragem} km</p>
+                  <h3 className="font-bold text-slate-900 text-base">{os.cliente?.nome || 'Sem cliente'}</h3>
+                  <p className="text-slate-500 text-sm mt-0.5 truncate">{os.observacao}</p>
+                  {(os.quilometragem || os.veiculo) && (
+                    <p className="text-slate-400 text-xs mt-1.5 flex gap-3">
+                      {os.quilometragem && <span>{os.quilometragem} km</span>}
+                      {os.veiculo && <span>🚗 {os.veiculo}</span>}
+                    </p>
                   )}
                   {os.mecanicos?.length > 0 && (
-                    <div className="flex gap-2 mt-3 flex-wrap">
+                    <div className="flex gap-1.5 mt-2.5 flex-wrap">
                       {os.mecanicos.map(m => (
-                        <span key={m.id} className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-lg font-medium">
+                        <span key={m.id} className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-md font-medium">
                           🔧 {m.mecanico?.nome}
                         </span>
                       ))}
                     </div>
                   )}
                 </div>
-                <div className="text-right ml-4">
-                  <p className="text-2xl font-black text-green-600">
+                {/* Direita: valor + ações */}
+                <div className="text-right shrink-0">
+                  <p className="text-xl font-black text-slate-900">
                     R$ {Number(os.valorTotal || 0).toFixed(2)}
                   </p>
-                  <div className="flex gap-2 mt-3 justify-end">
+                  <div className="flex items-center gap-1 mt-2 justify-end">
                     <select
-                      value={os.status}
+                      value={os.status || 'ABERTA'}
                       onChange={e => atualizarStatus(os.id, e.target.value)}
-                      className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 cursor-pointer"
+                      className="text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 cursor-pointer outline-none focus:border-slate-400"
                     >
                       <option value="ABERTA">Aberta</option>
-                      <option value="EM_SERVICO">Em Serviço</option>
                       <option value="CONCLUIDA">Concluída</option>
                       <option value="CANCELADA">Cancelada</option>
                     </select>
                     <button
-                      onClick={() => excluir(os.id)}
-                      className="text-slate-300 hover:text-red-500 transition p-1"
+                      type="button"
+                      onClick={() => baixarPdf(os.id)}
+                      className="text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1.5 transition"
+                      title="Baixar PDF"
                     >
-                      <Trash2 size={16} />
+                      <Printer size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => excluir(os.id)}
+                      className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition"
+                    >
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
@@ -233,38 +301,65 @@ export function OrdemServicoPage() {
 
       {/* Modal Nova OS */}
       {modalAberto && (
-        <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
-              <h3 className="text-xl font-bold text-slate-800">Nova Ordem de Serviço</h3>
-              <button onClick={() => { setModalAberto(false); setForm(formInicial); }} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-[4px]">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[70%] max-h-[90vh] overflow-y-auto">
+            {/* Modal header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-[30px] font-bold text-slate-900">Nova Ordem de Serviço</h3>
+                <p className="text-[14px] text-slate-400 mt-0.5">Preencha os dados do atendimento</p>
+              </div>
+              <button onClick={() => { setModalAberto(false); setForm(formInicial); }} className="text-slate-300 hover:text-slate-500 transition">
+                <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               {/* Cliente */}
               <div>
-                <label className="text-sm font-bold text-slate-600 block mb-2">Cliente *</label>
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Cliente</label>
                 <select
-                  className="w-full border border-slate-200 p-3 rounded-xl outline-blue-500 bg-white text-slate-700"
+                  className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition bg-white"
                   value={form.clienteId}
                   onChange={e => setForm({ ...form, clienteId: e.target.value })}
                   required
                 >
                   <option value="">Selecione o cliente</option>
                   {clientes.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
+                    <option key={c.id} value={c.id}>{c.nome} {c.cpf ? `- CPF: ${c.cpf}` : ''}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Observação */}
+              {/* Veículo */}
               <div>
-                <label className="text-sm font-bold text-slate-600 block mb-2">Descrição do serviço *</label>
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Veículo / Maquinário</label>
+                <input
+                  placeholder="Ex: Trator/Implemento"
+                  className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                  value={form.veiculo}
+                  onChange={e => setForm({ ...form, veiculo: e.target.value })}
+                />
+              </div>
+
+              {/* Quilometragem */}
+              <div>
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Quilometragem</label>
+                <input
+                  type="number"
+                  placeholder="Opicional*"
+                  className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                  value={form.quilometragem}
+                  onChange={e => setForm({ ...form, quilometragem: e.target.value })}
+                />
+              </div>
+
+              {/* Descrição */}
+              <div>
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Descrição do serviço</label>
                 <textarea
-                  placeholder="Descreva o que foi realizado..."
-                  className="w-full border border-slate-200 p-3 rounded-xl outline-blue-500 resize-none"
+                  placeholder="Descreva o que foi realizado: troca de óleo, revisão dos freios, etc."
+                  className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 resize-none transition"
                   rows={3}
                   value={form.observacao}
                   onChange={e => setForm({ ...form, observacao: e.target.value })}
@@ -272,115 +367,136 @@ export function OrdemServicoPage() {
                 />
               </div>
 
-              {/* Quilometragem */}
+              {/* Serviços (opcional) */}
               <div>
-                <label className="text-sm font-bold text-slate-600 block mb-2">Quilometragem (opcional)</label>
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">
+                  Serviços do catálogo <span className="text-slate-400 font-normal">(opcional)</span>
+                </label>
+                {/* Busca de serviços */}
                 <input
-                  type="number"
-                  placeholder="Ex: 150"
-                  className="w-full border border-slate-200 p-3 rounded-xl outline-blue-500"
-                  value={form.quilometragem}
-                  onChange={e => setForm({ ...form, quilometragem: e.target.value })}
+                  type="text"
+                  placeholder="Buscar serviço no catálogo..."
+                  value={buscaServico}
+                  onChange={e => {
+                    setBuscaServico(e.target.value);
+                    setPaginaServicos(1);
+                  }}
+                  className="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition mb-2"
                 />
+                {/* Lista paginada */}
+                <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1">
+                  {servicos
+                    .filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase()))
+                    .slice((paginaServicos - 1) * servicosPorPagina, paginaServicos * servicosPorPagina)
+                    .map(s => {
+                      const selecionado = form.itensServicoIds.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleServico(s.id)}
+                          className={`p-3 rounded-lg border text-left transition ${
+                            selecionado
+                              ? 'border-blue-600 bg-blue-50 text-blue-700'
+                              : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                          }`}
+                        >
+                          <p className="font-medium text-sm">{s.nomeServico}</p>
+                          <p className="text-xs mt-0.5 text-slate-400">R$ {Number(s.precoTabela || 0).toFixed(2)}</p>
+                        </button>
+                      );
+                    })}
+                </div>
+                {/* Paginação */}
+                {servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).length > servicosPorPagina && (
+                  <div className="flex items-center justify-center gap-2 mt-2">
+                    <button
+                      onClick={() => setPaginaServicos(p => Math.max(1, p - 1))}
+                      disabled={paginaServicos === 1}
+                      className="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-xs text-slate-500">
+                      Página {paginaServicos} de {Math.ceil(servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).length / servicosPorPagina)}
+                    </span>
+                    <button
+                      onClick={() => setPaginaServicos(p => Math.min(Math.ceil(servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).length / servicosPorPagina), p + 1))}
+                      disabled={paginaServicos >= Math.ceil(servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).length / servicosPorPagina)}
+                      className="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Próxima
+                    </button>
+                  </div>
+                )}
+                {form.itensServicoIds.length > 0 && (
+                  <p className="text-xs text-slate-500 mt-2">
+                    {form.itensServicoIds.length} serviço(s) selecionado(s)
+                  </p>
+                )}
               </div>
 
-              {/* Serviços do catálogo */}
+              {/* Valor */}
               <div>
-                <label className="text-sm font-bold text-slate-600 block mb-2">Serviços do catálogo</label>
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Valor Total</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    className="w-full border border-slate-200 pl-10 pr-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    value={form.valorTotal}
+                    onChange={e => setForm({ ...form, valorTotal: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Mecânicos */}
+              <div>
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Mecânicos Responsáveis</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {servicos.map(s => {
-                    const selecionado = form.itensServicoIds.includes(s.id);
+                  {funcionarios.map(f => {
+                    const selecionado = form.mecanicos.some(m => m.mecanicoId === f.id);
                     return (
                       <button
-                        key={s.id}
+                        key={f.id}
                         type="button"
-                        onClick={() => toggleServico(s.id)}
-                        className={`p-3 rounded-xl border text-left transition ${
+                        onClick={() => toggleMecanico(f.id)}
+                        className={`p-3 rounded-lg border text-left transition ${
                           selecionado
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700'
                             : 'border-slate-200 hover:bg-slate-50 text-slate-600'
                         }`}
                       >
-                        <p className="font-bold text-sm">{s.nomeServico}</p>
-                        <p className="text-xs mt-1">R$ {Number(s.precoTabela).toFixed(2)}</p>
+                        <p className="font-medium text-sm">{f.nome}</p>
+                        <p className="text-xs mt-0.5 text-slate-400">{f.cargo || '—'} • {f.percentualComissao || 0}%</p>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Valor total */}
-              <div>
-                <label className="text-sm font-bold text-slate-600 block mb-2">Valor Total (R$) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  className="w-full border border-slate-200 p-3 rounded-xl outline-blue-500 font-bold text-green-700"
-                  value={form.valorTotal}
-                  onChange={e => setForm({ ...form, valorTotal: e.target.value })}
-                  required
-                />
-                <p className="text-xs text-slate-400 mt-1">Preenchido automaticamente ao selecionar serviços. Pode ajustar manualmente.</p>
+              {/* Botões */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setModalAberto(false); setForm(formInicial); }}
+                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 px-4 py-3 bg-slate-900 text-white font-semibold rounded-lg hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  ) : 'Criar OS'}
+                </button>
               </div>
-
-              {/* Mecânicos */}
-              <div>
-                <label className="text-sm font-bold text-slate-600 block mb-2">Mecânicos envolvidos</label>
-                <div className="flex gap-2 mb-3">
-                  <select
-                    className="flex-1 border border-slate-200 p-3 rounded-xl outline-blue-500 bg-white text-slate-700"
-                    value={mecanicoSelecionado.id}
-                    onChange={e => setMecanicoSelecionado({ ...mecanicoSelecionado, id: e.target.value })}
-                  >
-                    <option value="">Selecione o funcionário</option>
-                    {funcionarios.map(f => (
-                      <option key={f.id} value={f.id}>{f.nome} — {f.cargo} ({f.percentualComissao}%)</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Valor R$"
-                    className="w-32 border border-slate-200 p-3 rounded-xl outline-blue-500"
-                    value={mecanicoSelecionado.valor}
-                    onChange={e => setMecanicoSelecionado({ ...mecanicoSelecionado, valor: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    onClick={adicionarMecanico}
-                    className="bg-blue-600 text-white px-4 rounded-xl hover:bg-blue-700 transition font-bold"
-                  >
-                    +
-                  </button>
-                </div>
-
-                {form.mecanicos.length > 0 && (
-                  <div className="space-y-2">
-                    {form.mecanicos.map(m => (
-                      <div key={m.mecanicoId} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        <div>
-                          <p className="font-bold text-sm text-slate-700">{m.nome}</p>
-                          <p className="text-xs text-slate-400">{m.cargo} — {m.percentual}% comissão</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-green-600 text-sm">R$ {Number(m.valorAtribuido).toFixed(2)}</span>
-                          <button type="button" onClick={() => removerMecanico(m.mecanicoId)} className="text-slate-300 hover:text-red-500 transition">
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition mt-2"
-              >
-                Salvar Ordem de Serviço
-              </button>
             </form>
           </div>
         </div>

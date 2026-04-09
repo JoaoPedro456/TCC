@@ -6,11 +6,11 @@ export function LayoutAdm() {
   const navigate = useNavigate();
 
   const menuItems = [
-    { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    { path: '/pessoas', label: 'Clientes & Equipe', icon: <Users size={20} /> },
-    { path: '/servicos', label: 'Serviços', icon: <Wrench size={20} /> },
-    { path: '/ordens', label: 'Ordens de Serviço', icon: <ClipboardList size={20} /> },
-    { path: '/relatorios', label: 'Relatórios', icon: <BarChart2 size={20} /> },
+    { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+    { path: '/pessoas', label: 'Clientes & Equipe', icon: <Users size={18} /> },
+    { path: '/servicos', label: 'Serviços', icon: <Wrench size={18} /> },
+    { path: '/ordens', label: 'Ordens de Serviço', icon: <ClipboardList size={18} /> },
+    { path: '/relatorios', label: 'Relatórios', icon: <BarChart2 size={18} /> },
   ];
 
   const handleLogout = () => {
@@ -19,16 +19,18 @@ export function LayoutAdm() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-100 text-gray-800">
-      <aside className="w-64 bg-slate-900 text-white fixed h-full shadow-xl flex flex-col">
-        <div className="p-6 border-b border-slate-800">
-          <h1 className="text-lg font-black flex items-center gap-3 text-blue-400">
-            <Wrench size={22} /> BAZANI MECÂNICA
+    <div className="flex min-h-screen bg-[#F5F7FA]">
+      <aside className="w-60 bg-[#0D1117] fixed h-full shadow-2xl flex flex-col">
+        {/* Logo */}
+        <div className="px-6 py-5 border-b border-white/[0.06]">
+          <h1 className="text-base font-extrabold flex items-center gap-2.5 text-[#3B82F6]">
+            <Wrench size={18} /> BAZANI MECÂNICA
           </h1>
-          <p className="text-slate-500 text-xs mt-1">Sistema de Gestão</p>
+          <p className="text-[#6B7280] text-[10px] mt-1 uppercase tracking-widest">Sistema de Gestão</p>
         </div>
 
-        <nav className="p-4 flex flex-col gap-1 flex-1">
+        {/* Nav */}
+        <nav className="px-3 py-4 flex flex-col gap-0.5 flex-1">
           {menuItems.map((item) => {
             const ativo = item.path === '/'
               ? location.pathname === '/'
@@ -37,31 +39,32 @@ export function LayoutAdm() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   ativo
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                    : 'hover:bg-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-[#1B2A4A] text-[#3B82F6]'
+                    : 'text-[#848E9A] hover:text-white hover:bg-white/[0.05]'
                 }`}
               >
                 {item.icon}
-                <span className="font-medium text-sm">{item.label}</span>
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        {/* Logout */}
+        <div className="px-3 py-3 border-t border-white/[0.06]">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 p-3 w-full text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition"
+            className="flex items-center gap-3 px-3 py-2.5 w-full text-[#848E9A] hover:text-red-400 hover:bg-white/[0.05] rounded-lg transition text-sm font-medium"
           >
-            <LogOut size={20} />
-            <span className="font-medium text-sm">Sair</span>
+            <LogOut size={18} />
+            <span>Sair</span>
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 ml-64 p-8 min-h-screen">
+      <main className="ml-60 flex-1 p-6 min-h-screen">
         <Outlet />
       </main>
     </div>
