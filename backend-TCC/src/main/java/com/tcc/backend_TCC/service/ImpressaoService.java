@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.awt.*;
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 public class ImpressaoService {
@@ -43,13 +45,12 @@ public class ImpressaoService {
         document.open();
 
         // ════════════════════════════════════════════════════════
-        // CABEÇALHO (Limpo e sem sobreposições)
+        // CABEÇALHO
         // ════════════════════════════════════════════════════════
         PdfPTable headerTable = new PdfPTable(2);
         headerTable.setWidthPercentage(100);
-        headerTable.setWidths(new float[]{60, 40}); // 60% esquerda, 40% direita
+        headerTable.setWidths(new float[]{60, 40});
 
-        // Esquerda: Dados da Empresa
         PdfPCell leftHeader = new PdfPCell();
         leftHeader.setBorder(Rectangle.BOTTOM);
         leftHeader.setBorderColor(CINZA_ESCURO);
@@ -57,7 +58,6 @@ public class ImpressaoService {
         leftHeader.addElement(new Paragraph("BAZANI MECÂNICA", F_TITULO));
         leftHeader.addElement(new Paragraph("Sistema de Gestão de Ordens de Serviço", F_SUBTITULO));
 
-        // Direita: Número da OS e Data
         PdfPCell rightHeader = new PdfPCell();
         rightHeader.setBorder(Rectangle.BOTTOM);
         rightHeader.setBorderColor(CINZA_ESCURO);
@@ -78,10 +78,10 @@ public class ImpressaoService {
         headerTable.addCell(leftHeader);
         headerTable.addCell(rightHeader);
         document.add(headerTable);
-        document.add(spacer(15f));
+        document.add(spacer(20f));
 
         // ════════════════════════════════════════════════════════
-        // SEÇÃO — DADOS DO CLIENTE
+        // DADOS DO CLIENTE
         // ════════════════════════════════════════════════════════
         document.add(buildSectionHeader("DADOS DO CLIENTE"));
 
@@ -95,12 +95,12 @@ public class ImpressaoService {
                 "Endereço:", safe(os.getCliente() != null ? os.getCliente().getEndereco() : null));
 
         document.add(tCliente);
-        document.add(spacer(30f));
+        document.add(spacer(35f));
 
         // ════════════════════════════════════════════════════════
-        // SEÇÃO — DESCRIÇÃO DO SERVIÇO (Foco Principal)
+        // INFORMAÇÕES DO SERVIÇO E VEÍCULO
         // ════════════════════════════════════════════════════════
-        document.add(buildSectionHeader("DESCRIÇÃO DO SERVIÇO"));
+        document.add(buildSectionHeader("INFORMAÇÕES DO SERVIÇO"));
 
         PdfPTable tDesc = new PdfPTable(1);
         tDesc.setWidthPercentage(100);
@@ -108,27 +108,57 @@ public class ImpressaoService {
         PdfPCell descCell = new PdfPCell();
         descCell.setPadding(10f);
         descCell.setBorderColor(PRETO);
-        descCell.setMinimumHeight(80f); // Garante um bom espaço mesmo se o texto for pequeno
+        descCell.setMinimumHeight(80f);
 
-        // Quilometragem menor e discreta acima da descrição
-        String kmTexto = (os.getQuilometragem() != null) ? os.getQuilometragem() + " km" : "Sem viagem";
-        Paragraph kmP = new Paragraph("Quilometragem: " + kmTexto, F_LABEL);
-        kmP.setSpacingAfter(8f);
-        descCell.addElement(kmP);
+        PdfPTable tInfoVeiculo = new PdfPTable(2);
+        tInfoVeiculo.setWidthPercentage(100);
+        tInfoVeiculo.setWidths(new float[]{50, 50});
 
-        // A Descrição em si
+        String veicTexto = (os.getVeiculo() != null) ? os.getVeiculo() : "Não informado";
+        PdfPCell cVeiculo = new PdfPCell(new Paragraph("Veículo/Máquina: " + veicTexto, F_LABEL));
+        cVeiculo.setBorder(Rectangle.NO_BORDER);
+        cVeiculo.setPadding(0);
+        cVeiculo.setPaddingBottom(10f);
+
+        String kmInfo = "Sem viagem";
+        if (os.getQuilometragem() != null && os.getQuilometragem() > 0) {
+            kmInfo = String.format("%.1f", os.getQuilometragem()).replace(".", ",") + " km";
+        }
+
+        PdfPCell cKm = new PdfPCell(new Paragraph("Deslocação: " + kmInfo, F_LABEL));
+        cKm.setBorder(Rectangle.NO_BORDER);
+        cKm.setPadding(0);
+        cKm.setPaddingBottom(10f);
+        cKm.setHorizontalAlignment(Element.ALIGN_RIGHT);
+
+        tInfoVeiculo.addCell(cVeiculo);
+        tInfoVeiculo.addCell(cKm);
+        descCell.addElement(tInfoVeiculo);
+
+        Paragraph lblDesc = new Paragraph("Descrição detalhada:", F_LABEL);
+        lblDesc.setSpacingAfter(4f);
+        descCell.addElement(lblDesc);
+
         Paragraph obsP = new Paragraph(safe(os.getObservacao()), F_NORMAL);
         descCell.addElement(obsP);
 
         tDesc.addCell(descCell);
         document.add(tDesc);
-        document.add(spacer(30f));
+        document.add(spacer(35f));
 
         // ════════════════════════════════════════════════════════
-        // SEÇÃO — SERVIÇOS DO CATÁLOGO
+        // MATEMÁTICA E DETALHAMENTO DE VALORES (SERVIÇOS + KM)
         // ════════════════════════════════════════════════════════
-        if (os.getItensServico() != null && !os.getItensServico().isEmpty()) {
-            document.add(buildSectionHeader("SERVIÇOS DO CATÁLOGO"));
+        BigDecimal totalGeral = os.getValorTotal() != null ? os.getValorTotal() : BigDecimal.ZERO;
+        BigDecimal qtdKm = os.getQuilometragem() != null ? BigDecimal.valueOf(os.getQuilometragem()) : BigDecimal.ZERO;
+        BigDecimal precoKm = os.getValorKm() != null ? os.getValorKm() : BigDecimal.ZERO;
+        BigDecimal custoKm = qtdKm.multiply(precoKm).setScale(2, RoundingMode.HALF_UP);
+
+        boolean temServicos = os.getItensServico() != null && !os.getItensServico().isEmpty();
+        boolean temCustoKm = custoKm.compareTo(BigDecimal.ZERO) > 0;
+
+        if (temServicos || temCustoKm) {
+            document.add(buildSectionHeader("DETALHAMENTO DE VALORES"));
 
             PdfPTable tSvc = new PdfPTable(2);
             tSvc.setWidthPercentage(100);
@@ -137,16 +167,27 @@ public class ImpressaoService {
             tSvc.addCell(buildTableHeader("Descrição"));
             tSvc.addCell(buildTableHeader("Valor (R$)"));
 
-            for (var item : os.getItensServico()) {
-                tSvc.addCell(styledCell(safe(item.getNomeServico()), Element.ALIGN_LEFT));
-                tSvc.addCell(styledCell("R$ " + safe(item.getPrecoTabela()), Element.ALIGN_CENTER));
+            // 1. Adiciona os Serviços do Catálogo
+            if (temServicos) {
+                for (var item : os.getItensServico()) {
+                    tSvc.addCell(styledCell(safe(item.getNomeServico()), Element.ALIGN_LEFT));
+                    tSvc.addCell(styledCell("R$ " + String.format("%.2f", item.getPrecoTabela()).replace(".", ","), Element.ALIGN_CENTER));
+                }
             }
+
+            // 2. Adiciona o Custo da Deslocação (KM) como um item faturado
+            if (temCustoKm) {
+                String lblCustoKm = "Deslocação (" + String.format("%.1f", os.getQuilometragem()).replace(".", ",") + " km)";
+                tSvc.addCell(styledCell(lblCustoKm, Element.ALIGN_LEFT));
+                tSvc.addCell(styledCell("R$ " + String.format("%.2f", custoKm).replace(".", ","), Element.ALIGN_CENTER));
+            }
+
             document.add(tSvc);
-            document.add(spacer(15f));
+            document.add(spacer(20f));
         }
 
         // ════════════════════════════════════════════════════════
-        // SEÇÃO — MECÂNICOS ENVOLVIDOS (Só Nomes)
+        // MECÂNICOS
         // ════════════════════════════════════════════════════════
         if (os.getMecanicos() != null && !os.getMecanicos().isEmpty()) {
             document.add(buildSectionHeader("MECÂNICOS ENVOLVIDOS"));
@@ -163,18 +204,18 @@ public class ImpressaoService {
                 tMec.addCell(mecCell);
             }
             document.add(tMec);
-            document.add(spacer(20f));
+            document.add(spacer(25f));
         }
 
         // ════════════════════════════════════════════════════════
-        // VALOR TOTAL E ASSINATURA (Lado a Lado)
+        // VALOR TOTAL E ASSINATURA (LIMPO)
         // ════════════════════════════════════════════════════════
         PdfPTable tBottom = new PdfPTable(2);
         tBottom.setWidthPercentage(100);
-        tBottom.setWidths(new float[]{40, 60}); // 40% para Total, 60% para Assinatura
+        tBottom.setWidths(new float[]{45, 55});
         tBottom.setSpacingBefore(10f);
 
-        // Caixa do Valor Total (Esquerda)
+        // Caixa de Total
         PdfPCell totalCell = new PdfPCell();
         totalCell.setBorder(Rectangle.BOX);
         totalCell.setBorderWidth(1.5f);
@@ -187,13 +228,13 @@ public class ImpressaoService {
         lblTotal.setAlignment(Element.ALIGN_CENTER);
         totalCell.addElement(lblTotal);
 
-        String totalFormatado = "R$ " + (os.getValorTotal() != null ? os.getValorTotal() : "0.00");
-        Paragraph valTotal = new Paragraph(totalFormatado, F_DESTAQUE_TOTAL);
+        String totalFmt = String.format("%.2f", totalGeral).replace(".", ",");
+        Paragraph valTotal = new Paragraph("R$ " + totalFmt, F_DESTAQUE_TOTAL);
         valTotal.setAlignment(Element.ALIGN_CENTER);
         valTotal.setSpacingBefore(5f);
         totalCell.addElement(valTotal);
 
-        // Área de Assinatura (Direita)
+        // Caixa de Assinatura
         PdfPCell sigCell = new PdfPCell();
         sigCell.setBorder(Rectangle.NO_BORDER);
         sigCell.setVerticalAlignment(Element.ALIGN_BOTTOM);
@@ -215,7 +256,7 @@ public class ImpressaoService {
         // ════════════════════════════════════════════════════════
         // RODAPÉ
         // ════════════════════════════════════════════════════════
-        document.add(spacer(30f));
+        document.add(spacer(40f));
         Paragraph rodape = new Paragraph("Documento gerado pelo Sistema Bazani Mecânica e Autopeças", F_SUBTITULO);
         rodape.setAlignment(Element.ALIGN_CENTER);
         document.add(rodape);
@@ -224,15 +265,11 @@ public class ImpressaoService {
         return baos.toByteArray();
     }
 
-    // ════════════════════════════════════════════════════════════
-    // FUNÇÕES AUXILIARES (HELPERS)
-    // ════════════════════════════════════════════════════════════
-
     private PdfPTable buildSectionHeader(String titulo) {
         PdfPTable t = new PdfPTable(1);
         t.setWidthPercentage(100);
         PdfPCell cell = new PdfPCell(new Paragraph(titulo, F_SEC_HEADER));
-        cell.setBackgroundColor(PRETO); // Fundo Preto
+        cell.setBackgroundColor(PRETO);
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPadding(6f);
         t.addCell(cell);
@@ -284,7 +321,6 @@ public class ImpressaoService {
         return new Chunk(" \n", new Font(Font.HELVETICA, height));
     }
 
-    // Agora o "safe" aceita Objetos (como LocalDate ou BigDecimal) e transforma em texto
     private String safe(Object val) {
         return (val != null && !val.toString().isBlank()) ? val.toString() : "N/A";
     }

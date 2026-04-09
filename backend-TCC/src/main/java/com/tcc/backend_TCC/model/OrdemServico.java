@@ -24,17 +24,20 @@ public class OrdemServico {
     @JoinColumn(name = "cliente_id", nullable = false)
     private Pessoa cliente;
 
-
     private LocalDate dataRegisto = LocalDate.now();
 
     @Size(max = 500, message = "Observação deve ter no máximo 500 caracteres")
     private String observacao;
 
+    @Size(max = 100, message = "Veículo deve ter no máximo 100 caracteres")
+    private String veiculo;
+
     @DecimalMin(value = "0.0", message = "Quilometragem não pode ser negativa")
     private Double quilometragem;
 
-    @Size(max = 50, message = "Veículo deve ter no máximo 50 caracteres")
-    private String veiculo;
+    // --- NOVO CAMPO: Valor cobrado por KM ---
+    @DecimalMin(value = "0.0", message = "Valor do KM não pode ser negativo")
+    private BigDecimal valorKm;
 
     @NotNull(message = "Valor total é obrigatório")
     @DecimalMin(value = "0.0", message = "Valor total não pode ser negativo")
@@ -44,7 +47,6 @@ public class OrdemServico {
     @Enumerated(EnumType.STRING)
     private StatusOS status = StatusOS.ABERTA;
 
-    // Lista de serviços do catálogo selecionados
     @ManyToMany
     @JoinTable(
             name = "os_itens_servico",
@@ -54,7 +56,6 @@ public class OrdemServico {
     @JsonIgnore
     private List<ItemServico> itensServico = new ArrayList<>();
 
-    // Lista de mecânicos envolvidos
     @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<OrdemServicoMecanico> mecanicos = new ArrayList<>();

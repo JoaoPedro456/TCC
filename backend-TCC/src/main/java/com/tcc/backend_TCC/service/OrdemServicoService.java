@@ -32,7 +32,6 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServico salvar(OrdemServico os) {
-        // Vincula cada mecânico à OS antes de salvar
         if (os.getMecanicos() != null) {
             for (OrdemServicoMecanico m : os.getMecanicos()) {
                 m.setOrdemServico(os);
@@ -45,7 +44,6 @@ public class OrdemServicoService {
     public OrdemServico salvarDTO(OrdemServicoDTO dto) {
         OrdemServico os = new OrdemServico();
 
-        // Vincula cliente
         if (dto.getCliente() != null && dto.getCliente().getId() != null) {
             Pessoa cliente = pessoaRepository.findById(dto.getCliente().getId())
                     .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
@@ -53,17 +51,20 @@ public class OrdemServicoService {
         }
 
         os.setObservacao(dto.getObservacao());
+        os.setVeiculo(dto.getVeiculo());
         os.setQuilometragem(dto.getQuilometragem());
+
+        // --- NOVO: Salva o valor do KM ---
+        os.setValorKm(dto.getValorKm() != null ? dto.getValorKm() : BigDecimal.ZERO);
+
         os.setValorTotal(dto.getValorTotal() != null ? dto.getValorTotal() : BigDecimal.ZERO);
         os.setStatus(StatusOS.ABERTA);
 
-        // Vincula itens de servico
         if (dto.getItensServicoIds() != null && !dto.getItensServicoIds().isEmpty()) {
             List<ItemServico> itens = itemServicoRepository.findAllById(dto.getItensServicoIds());
             os.setItensServico(itens);
         }
 
-        // Vincula mecanicos (sem valor, comissao calculada automaticamente)
         if (dto.getMecanicos() != null && !dto.getMecanicos().isEmpty()) {
             List<OrdemServicoMecanico> mecanicos = new ArrayList<>();
             for (var mDto : dto.getMecanicos()) {
