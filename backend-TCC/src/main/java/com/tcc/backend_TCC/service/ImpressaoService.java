@@ -3,16 +3,25 @@ package com.tcc.backend_TCC.service;
 import com.lowagie.text.*;
 import com.lowagie.text.Font;
 import com.lowagie.text.Rectangle;
-import com.lowagie.text.pdf.*;
+import com.lowagie.text.pdf.PdfContentByte;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 import com.tcc.backend_TCC.model.OrdemServico;
+import com.tcc.backend_TCC.model.OrdemServicoMecanico;
+import com.tcc.backend_TCC.model.Pessoa;
+import com.tcc.backend_TCC.repository.OrdemServicoMecanicoRepository;
 import com.tcc.backend_TCC.repository.OrdemServicoRepository;
+import com.tcc.backend_TCC.repository.PessoaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import com.lowagie.text.pdf.PdfGState;
 import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class ImpressaoService {
@@ -40,7 +49,7 @@ public class ImpressaoService {
 
         Document document = new Document(PageSize.A4, 36, 36, 36, 36);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter.getInstance(document, baos);
+        PdfWriter writer = PdfWriter.getInstance(document, baos);
 
         document.open();
 
@@ -253,13 +262,33 @@ public class ImpressaoService {
         tBottom.addCell(sigCell);
         document.add(tBottom);
 
+
         // ════════════════════════════════════════════════════════
-        // RODAPÉ
+        // RODAPÉ (Modificado para letra menor e transparente)
         // ════════════════════════════════════════════════════════
-        document.add(spacer(40f));
-        Paragraph rodape = new Paragraph("Documento gerado pelo Sistema Bazani Mecânica e Autopeças", F_SUBTITULO);
+
+        document.add(spacer(60f));
+        Font fonteRodapePequena = new Font(F_SUBTITULO.getBaseFont(), 8f, F_SUBTITULO.getStyle(), F_SUBTITULO.getColor());
+        Paragraph rodape = new Paragraph("Documento gerado pelo Sistema Bazani Mecânica e Autopeças", fonteRodapePequena);
         rodape.setAlignment(Element.ALIGN_CENTER);
-        document.add(rodape);
+        try {
+            PdfGState estadoGraficoTransparente = new PdfGState();
+            estadoGraficoTransparente.setFillOpacity(0.5f); // 0.0f (totalmente transparente) a 1.0f (opaco). 0.5f é 50%.
+
+            // Obtemos o conteúdo direto do writer para aplicar o estado
+            PdfContentByte cb = writer.getDirectContent();
+            cb.saveState();
+            cb.setGState(estadoGraficoTransparente); // Aplica a transparência
+
+            document.add(rodape);
+            cb.restoreState(); // Restaura o estado original (volta a ser opaco para os próximos elementos)
+
+        } catch (Exception e) {
+            // Caso não consiga aplicar a transparência (ex: sem acesso ao writer),
+            // adiciona o rodapé menor, mas opaco, como segurança.
+            document.add(rodape);
+            e.printStackTrace();
+        }
 
         document.close();
         return baos.toByteArray();
@@ -323,5 +352,80 @@ public class ImpressaoService {
 
     private String safe(Object val) {
         return (val != null && !val.toString().isBlank()) ? val.toString() : "N/A";
+    }
+
+    @Autowired
+    private PessoaRepository pessoaRepository;
+
+    @Autowired
+    private OrdemServicoMecanicoRepository mecanicoRepository;
+
+    public byte[] gerarPdfComissao(Long funcId, LocalDate inicio, LocalDate fim) throws Exception {
+        Pessoa func = pessoaRepository.findById(funcId).orElseThrow();
+        // Busca as OSs onde ele trabalhou e que estão CONCLUÍDAS
+        List<OrdemServicoMecanico> participacoes = mecanicoRepository.buscarComissoesMes(funcId, inicio, fim);
+
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter.getInstance(document, baos);
+        document.open();
+
+        // Cabeçalho do Relatório
+        document.add(new Paragraph("RELATÓRIO DE COMISSÕES E PAGAMENTO", F_TITULO));
+        document.add(new Paragraph("Funcionário: " + func.getNome() + " (" + func.getCargo() + ")", F_NORMAL));
+        document.add(new Paragraph("Período: " + inicio.getMonthValue() + "/" + inicio.getYear(), F_SUBTITULO));
+        document.add(spacer(20f));
+
+        // Tabela de OSs realizadas
+        PdfPTable table = new PdfPTable(4);
+        table.setWidthPercentage(100);
+        table.setWidths(new float[]{15, 20, 45, 20});
+
+        table.addCell(buildTableHeader("Data"));
+        table.addCell(buildTableHeader("OS #"));
+        table.addCell(buildTableHeader("Cliente"));
+        table.addCell(buildTableHeader("Comissão (R$)"));
+
+        BigDecimal totalComissao = BigDecimal.ZERO;
+        for (OrdemServicoMecanico p : participacoes) {
+            // Agora o valorAtribuido já vem do banco calculado apenas sobre o serviço!
+            BigDecimal valorComissaoOs = p.getValorAtribuido() != null ? p.getValorAtribuido() : BigDecimal.ZERO;
+
+            table.addCell(styledCell(p.getOrdemServico().getDataRegisto().toString(), Element.ALIGN_LEFT));
+            table.addCell(styledCell(p.getOrdemServico().getId().toString(), Element.ALIGN_CENTER));
+            table.addCell(styledCell(p.getOrdemServico().getCliente().getNome(), Element.ALIGN_LEFT));
+            table.addCell(styledCell("R$ " + String.format("%.2f", valorComissaoOs).replace(".", ","), Element.ALIGN_RIGHT));
+
+            totalComissao = totalComissao.add(valorComissaoOs);
+        }
+        document.add(table);
+        document.add(spacer(30f));
+
+        // Fechamento Financeiro (A "Mágica" do Salário + Comissão)
+        PdfPTable resumo = new PdfPTable(2);
+        resumo.setWidthPercentage(50);
+        resumo.setHorizontalAlignment(Element.ALIGN_RIGHT);
+
+        BigDecimal salarioBase = BigDecimal.valueOf(func.getSalarioBase() != null ? func.getSalarioBase() : 0);
+        BigDecimal totalGeral = salarioBase.add(totalComissao);
+
+        addResumoLinha(resumo, "Salário Base:", salarioBase);
+        addResumoLinha(resumo, "Total Comissões:", totalComissao);
+        addResumoLinha(resumo, "TOTAL A RECEBER:", totalGeral);
+
+        document.add(resumo);
+        document.close();
+        return baos.toByteArray();
+    }
+
+    private void addResumoLinha(PdfPTable table, String label, BigDecimal valor) {
+        PdfPCell c1 = new PdfPCell(new Paragraph(label, F_LABEL));
+        c1.setBorder(Rectangle.NO_BORDER);
+        table.addCell(c1);
+
+        PdfPCell c2 = new PdfPCell(new Paragraph("R$ " + String.format("%.2f", valor), F_NORMAL));
+        c2.setBorder(Rectangle.NO_BORDER);
+        c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        table.addCell(c2);
     }
 }

@@ -1,16 +1,20 @@
 package com.tcc.backend_TCC.service;
 
+import com.tcc.backend_TCC.enuns.StatusLancamento;
 import com.tcc.backend_TCC.enuns.StatusOS;
+import com.tcc.backend_TCC.enuns.TipoLancamento;
 import com.tcc.backend_TCC.model.*;
+import com.tcc.backend_TCC.repository.ItemServicoRepository;
+import com.tcc.backend_TCC.repository.LancamentoRepository;
 import com.tcc.backend_TCC.repository.OrdemServicoMecanicoRepository;
 import com.tcc.backend_TCC.repository.OrdemServicoRepository;
 import com.tcc.backend_TCC.repository.PessoaRepository;
-import com.tcc.backend_TCC.repository.ItemServicoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +33,10 @@ public class OrdemServicoService {
 
     @Autowired
     private ItemServicoRepository itemServicoRepository;
+
+    // 👇 1. Injetamos o repositório financeiro para a OS conseguir gerar faturamento
+    @Autowired
+    private LancamentoRepository lancamentoRepository;
 
     @Transactional
     public OrdemServico salvar(OrdemServico os) {
@@ -54,9 +62,7 @@ public class OrdemServicoService {
         os.setVeiculo(dto.getVeiculo());
         os.setQuilometragem(dto.getQuilometragem());
 
-        // --- NOVO: Salva o valor do KM ---
         os.setValorKm(dto.getValorKm() != null ? dto.getValorKm() : BigDecimal.ZERO);
-
         os.setValorTotal(dto.getValorTotal() != null ? dto.getValorTotal() : BigDecimal.ZERO);
         os.setStatus(StatusOS.ABERTA);
 
@@ -65,20 +71,37 @@ public class OrdemServicoService {
             os.setItensServico(itens);
         }
 
-        if (dto.getMecanicos() != null && !dto.getMecanicos().isEmpty()) {
+        BigDecimal totalGeral = dto.getValorTotal();
+        BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
+        BigDecimal precoKm = dto.getValorKm() != null ? dto.getValorKm() : BigDecimal.ZERO;
+
+        BigDecimal custoKm = qtdKm.multiply(precoKm);
+        BigDecimal valorApenasServico = totalGeral.subtract(custoKm);
+
+        if (dto.getMecanicos() != null) {
             List<OrdemServicoMecanico> mecanicos = new ArrayList<>();
             for (var mDto : dto.getMecanicos()) {
-                OrdemServicoMecanico mecanico = new OrdemServicoMecanico();
-                mecanico.setOrdemServico(os);
-                if (mDto.getMecanico() != null && mDto.getMecanico().getId() != null) {
-                    Pessoa func = pessoaRepository.findById(mDto.getMecanico().getId())
-                            .orElseThrow(() -> new RuntimeException("Mecânico não encontrado"));
-                    mecanico.setMecanico(func);
-                    mecanicos.add(mecanico);
-                }
+                OrdemServicoMecanico osm = new OrdemServicoMecanico();
+                osm.setOrdemServico(os);
+
+                Pessoa func = pessoaRepository.findById(mDto.getMecanico().getId()).orElseThrow();
+                osm.setMecanico(func);
+
+                BigDecimal porcentagem = BigDecimal.valueOf(func.getPercentualComissao() != null ? func.getPercentualComissao() : 0);
+
+                BigDecimal valorComissao = valorApenasServico.multiply(porcentagem)
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+                osm.setValorAtribuido(valorComissao);
+                mecanicos.add(osm);
             }
             os.setMecanicos(mecanicos);
         }
+
+        os.setVeiculo(dto.getVeiculo());
+        os.setQuilometragem(dto.getQuilometragem());
+        os.setValorKm(dto.getValorKm());
+        os.setValorTotal(totalGeral);
 
         return repository.save(os);
     }
@@ -92,10 +115,28 @@ public class OrdemServicoService {
                 .orElseThrow(() -> new RuntimeException("OS não encontrada"));
     }
 
+    // 👇 2. A MÁGICA ACONTECE AQUI
     @Transactional
     public OrdemServico atualizarStatus(Long id, String status) {
         OrdemServico os = buscarPorId(id);
-        os.setStatus(StatusOS.valueOf(status));
+        StatusOS novoStatus = StatusOS.valueOf(status);
+
+        // Se o status da OS está mudando para CONCLUÍDA e ela ainda não era CONCLUÍDA
+        if (novoStatus == StatusOS.CONCLUIDA && os.getStatus() != StatusOS.CONCLUIDA) {
+
+            Lancamento contaReceber = new Lancamento();
+            contaReceber.setDescricao("OS #" + os.getId() + " - " + (os.getVeiculo() != null ? os.getVeiculo() : "Serviços"));
+            contaReceber.setEnvolvido(os.getCliente() != null ? os.getCliente().getNome() : "Cliente não informado");
+            contaReceber.setValor(os.getValorTotal());
+            contaReceber.setVencimento(LocalDate.now()); // Coloca o vencimento para o dia de hoje
+            contaReceber.setTipo(TipoLancamento.RECEBER);
+            contaReceber.setStatus(StatusLancamento.PENDENTE);
+
+            // Salva a conta na tabela de faturamento!
+            lancamentoRepository.save(contaReceber);
+        }
+
+        os.setStatus(novoStatus);
         return repository.save(os);
     }
 

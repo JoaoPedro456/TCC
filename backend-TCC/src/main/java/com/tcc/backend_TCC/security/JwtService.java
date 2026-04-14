@@ -1,6 +1,8 @@
 package com.tcc.backend_TCC.security;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -8,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
-import java.util.Map;
 
 @Service
 public class JwtService {
@@ -20,7 +21,7 @@ public class JwtService {
     public JwtService(Environment env) {
         // L� do application.properties (ou vari�vel de ambiente JWT_SECRET)
         this.SECRET = env.getProperty("jwt.secret", "bazani-mecanica-tcc-secret-key-2024-default");
-        String expStr = env.getProperty("jwt.expiration", "28800000");
+        String expStr = env.getProperty("jwt.expiration", "39600000");
         this.EXPIRACAO = Long.parseLong(expStr);
     }
 
