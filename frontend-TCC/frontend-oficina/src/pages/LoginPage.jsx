@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// APAGUEI o useNavigate daqui!
 import { Wrench, LogIn, Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
 
@@ -8,7 +8,6 @@ export function LoginPage() {
   const [erro, setErro] = useState('');
   const [loading, setLoading] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,8 +15,12 @@ export function LoginPage() {
     setLoading(true);
     try {
       const res = await api.post('/auth/login', form);
+      // Salva o token no navegador
       localStorage.setItem('token', res.data.token);
-      navigate('/');
+      
+      // 👇 MAGIA AQUI: Recarrega a página para o App.jsx ler o token e abrir o sistema!
+      window.location.reload(); 
+      
     } catch {
       setErro('Login ou senha incorretos.');
     } finally {

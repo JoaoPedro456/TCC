@@ -37,10 +37,6 @@ export function RelatorioPage() {
     }
   };
 
-  const totalGeral = relatorio
-    ? relatorio.reduce((acc, r) => acc + Number(r.totalReceber || 0), 0)
-    : 0;
-
   // Preparando os dados para o Gráfico (só executa se 'faturamento' existir)
   const dadosOS = faturamento ? [
     { name: 'Abertas', value: Number(faturamento.abertas || 0), color: '#F59E0B' },   // amber-500
@@ -110,8 +106,7 @@ export function RelatorioPage() {
           <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
             {[
               { key: 'visao-geral', label: 'Visão Geral' },
-              { key: 'comissoes', label: 'Comissões' },
-              { key: 'tabela', label: 'Tabela' },
+              { key: 'tabela', label: 'Comissões' },
             ].map(a => (
               <button
                 key={a.key}
@@ -194,12 +189,6 @@ export function RelatorioPage() {
                   <p className="text-[10px] text-slate-400 uppercase font-semibold">Canceladas</p>
                 </div>
               </div>
-              {totalGeral > 0 && (
-                <div className="bg-slate-900 rounded-lg p-4 text-center">
-                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide">Total Comissões + Salários</p>
-                  <p className="text-xl font-black text-white mt-1">R$ {totalGeral.toFixed(2)}</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -223,7 +212,7 @@ export function RelatorioPage() {
             <tbody className="divide-y divide-slate-100">
               {relatorio.map((r, i) => (
                 <tr key={i} className="hover:bg-slate-50/50">
-                  <td className="px-5 py-3.5 font-semibold text-slate-900">{r.funcionario}</td>
+                  <td className="px-5 py-3.5 font-semibold text-slate-900">{r.nome}</td>
                   <td className="px-5 py-3.5 text-sm text-slate-500">{r.cargo || '—'}</td>
                   <td className="px-5 py-3.5 text-sm text-slate-500">{r.percentualComissao}%</td>
                   <td className="px-5 py-3.5 text-sm text-slate-500">{r.quantidadeOS}</td>
@@ -234,35 +223,6 @@ export function RelatorioPage() {
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {/* ABA: Comissoes grafico (simplificado) */}
-      {aba === 'comissoes' && relatorio && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-4 text-sm">Comissões por Funcionário</h3>
-          <div className="space-y-3">
-            {relatorio.map((r, i) => (
-              <div key={i} className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg">
-                <div className="w-32">
-                  <p className="font-semibold text-slate-900 text-sm">{r.funcionario}</p>
-                  <p className="text-xs text-slate-400">{r.cargo || '—'}</p>
-                </div>
-                <div className="flex-1">
-                  <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-600 rounded-full"
-                      style={{ width: `${Math.min((Number(r.totalReceber || 0) / (totalGeral || 1)) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="w-32 text-right">
-                  <p className="font-black text-slate-900">R$ {Number(r.totalReceber || 0).toFixed(2)}</p>
-                  <p className="text-xs text-slate-400">{r.quantidadeOS} OS</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>

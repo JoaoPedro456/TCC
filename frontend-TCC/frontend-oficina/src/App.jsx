@@ -1,34 +1,64 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { LayoutAdm } from './layouts/LayoutAdm.jsx';
-import { LoginPage } from './pages/LoginPage.jsx';
-import { DashboardPage } from './pages/DashboardPage.jsx';
-import { PessoaPage } from './pages/PessoaPage.jsx';
-import { ServicoPage } from './pages/ServicoPage.jsx';
-import { OrdemServicoPage } from './pages/OrdemServicoPage.jsx';
-import { RelatorioPage } from './pages/RelatorioPage.jsx';
-import { ProtectedRoute } from './components/ProtectedRoute.jsx';
-import { ToastProvider } from './components/ToastProvider.jsx';
+import React, { useState } from 'react';
+import { Sidebar } from './components/SideBar'; 
+import { OrdemServicoPage } from './pages/OrdemServicoPage'; 
+import { PessoaPage } from './pages/PessoaPage'; 
+import { ServicoPage } from './pages/ServicoPage'; 
+import { RelatorioPage } from './pages/RelatorioPage'; 
+import { ToastProvider } from './components/ToastProvider'; 
+import { ComissaoPage } from './pages/ComissaoPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { FaturamentoPage } from './pages/FaturamentoPage';  
+import { LoginPage } from './pages/LoginPage'; 
 
 export default function App() {
+  const [abaAtiva, setAbaAtiva] = useState('os'); 
+
+  // Pega o token do navegador
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    return (
+      <ToastProvider>
+        <LoginPage /> 
+      </ToastProvider>
+    );
+  }
+
+  // Se tem token, renderiza o sistema por dentro
+  const renderizarPagina = () => {
+    switch (abaAtiva) {
+      case 'dashboard':
+        return <DashboardPage setAbaAtiva={setAbaAtiva} />;
+      case 'os':
+        return <OrdemServicoPage />;
+      case 'pessoas':
+        return <PessoaPage />;
+      case 'catalogo':
+        return <ServicoPage />;
+      case 'faturamento':
+        return <FaturamentoPage />;
+      case 'comissoes':
+        return <ComissaoPage />;
+      case 'relatorios':
+        return <RelatorioPage abaInicial={abaAtiva} />;
+      default:
+        return <OrdemServicoPage />;
+    }
+  };
+
   return (
     <ToastProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={
-            <ProtectedRoute>
-              <LayoutAdm />
-            </ProtectedRoute>
-          }>
-            <Route index element={<DashboardPage />} />
-            <Route path="pessoas" element={<PessoaPage />} />
-            <Route path="servicos" element={<ServicoPage />} />
-            <Route path="ordens" element={<OrdemServicoPage />} />
-            <Route path="relatorios" element={<RelatorioPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <div className="min-h-screen bg-slate-50/50 flex">
+        
+        <Sidebar abaAtiva={abaAtiva} setAbaAtiva={setAbaAtiva} />
+
+        <main className="flex-1 ml-72 min-w-0">
+          <div className="p-8">
+            {renderizarPagina()}
+          </div>
+        </main>
+        
+      </div>
     </ToastProvider>
   );
 }
