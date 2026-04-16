@@ -43,9 +43,15 @@ export function Sidebar() {
     { id: 'relatorios', nome: 'Relatórios Gerais', icone: BarChart2 },
   ];
 
-  const handleLogout = () => {
+const handleLogout = () => {
+    // 1. Remove o token do navegador
     localStorage.removeItem('token');
+    
+    // 2. Manda para a rota de login
     navigate('/login', { replace: true });
+    
+    // 3. O pulo do gato: Força um F5 automático para limpar a memória do React!
+    window.location.reload();
   };
 
   const handleNavigate = (routeKey) => {
