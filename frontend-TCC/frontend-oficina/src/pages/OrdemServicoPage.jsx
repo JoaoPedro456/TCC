@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../services/api';
-import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search } from 'lucide-react';
+import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
 
 const STATUS_CONFIG = {
@@ -22,6 +22,9 @@ export function OrdemServicoPage() {
   const [buscaServico, setBuscaServico] = useState('');
   const [paginaServicos, setPaginaServicos] = useState(1);
   const servicosPorPagina = 8;
+  const [paginaOS, setPaginaOS] = useState(0);
+  const [totalPaginasOS, setTotalPaginasOS] = useState(1);
+  const [totalElementos, setTotalElementos] = useState(0);
   const { success, error } = useToast();
 
   // --- ATUALIZAÇÃO DO ESTADO INICIAL ---
@@ -40,12 +43,22 @@ export function OrdemServicoPage() {
 
   const carregar = useCallback(async () => {
     try {
+      const params = {
+        page: paginaOS,
+        size: 20,
+      };
+      if (filtroStatus !== 'TODOS') {
+        params.status = filtroStatus;
+      }
+
       const [resOrdens, resPessoas, resServicos] = await Promise.all([
-        api.get('/ordens'),
+        api.get('/ordens', { params }),
         api.get('/pessoa'),
         api.get('/servico'),
       ]);
-      setOrdens(resOrdens.data);
+      setOrdens(resOrdens.data.content || []);
+      setTotalPaginasOS(resOrdens.data.totalPages || 1);
+      setTotalElementos(resOrdens.data.totalElements || 0);
       setClientes(resPessoas.data.filter(p => p.tipo === 'CLIENTE'));
       setFuncionarios(resPessoas.data.filter(p => p.tipo === 'FUNCIONARIO'));
       setServicos(resServicos.data);
@@ -55,7 +68,7 @@ export function OrdemServicoPage() {
     } finally {
       setLoading(false);
     }
-  }, [error]);
+  }, [error, paginaOS, filtroStatus]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -209,7 +222,7 @@ export function OrdemServicoPage() {
       <div className="flex justify-between items-end flex-wrap gap-4 mb-8">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Ordens de Serviço</h2>
-          <p className="text-slate-500 text-sm mt-1">{ordens.length} ordens registradas</p>
+          <p className="text-slate-500 text-sm mt-1">{totalElementos} ordens registradas</p>
         </div>
         <button onClick={() => setModalAberto(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 shadow-lg transition">
           <Plus size={18} /> Nova OS
@@ -286,6 +299,31 @@ export function OrdemServicoPage() {
           );
         })}
       </div>
+
+      {/* Paginação */}
+      {totalPaginasOS > 1 && (
+        <div className="flex items-center justify-between mt-6 bg-white rounded-xl border border-slate-200 px-5 py-3">
+          <p className="text-sm text-slate-500">
+            Página {paginaOS + 1} de {totalPaginasOS}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPaginaOS(p => Math.max(p - 1, 0))}
+              disabled={paginaOS === 0}
+              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={() => setPaginaOS(p => Math.min(p + 1, totalPaginasOS - 1))}
+              disabled={paginaOS >= totalPaginasOS - 1}
+              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Nova OS */}
       {modalAberto && (

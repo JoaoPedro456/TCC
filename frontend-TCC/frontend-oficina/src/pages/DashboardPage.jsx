@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { Users, ClipboardList, ArrowUpRight, CheckCircle2, Calendar, X, Folder, Activity, PlusCircle, FileText, Clock } from 'lucide-react';
-import { PessoaPage } from './PessoaPage';
 
-export function DashboardPage({ setAbaAtiva }) {
+export function DashboardPage() {
   const [stats, setStats] = useState({
     clientes: 0, 
     funcionarios: 0, 
@@ -20,45 +19,54 @@ export function DashboardPage({ setAbaAtiva }) {
   
   const [loading, setLoading] = useState(true);
   const [mesFormatado, setMesFormatado] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const carregar = async () => {
       try {
-        const [resPessoas, resOrdens, resDash] = await Promise.all([
-          api.get('/pessoa'),
-          api.get('/ordens'),
-          api.get('/relatorios/dashboard'),
-        ]);
+          // ... dentro do seu carregar()
+          const [resPessoas, resOrdens, resDash] = await Promise.all([
+            api.get('/pessoa'),
+            api.get('/ordens'),
+            api.get('/relatorios/dashboard'),
+          ]);
 
-        // 1. Pega a data de hoje formatada (YYYY-MM-DD) considerando o fuso local
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hoje = `${year}-${month}-${day}`;
+          // 1. Pega a data de hoje formatada (YYYY-MM-DD)
+          const d = new Date();
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const hoje = `${year}-${month}-${day}`;
 
-        // 2. Filtra as Ordens criadas HOJE
-        const ordensHoje = resOrdens.data.filter(o => o.dataRegisto === hoje);
+          // --- CORREÇÃO AQUI ---
+          // Verificamos se resOrdens.data é uma página (tem .content) ou um array simples
+          const listaDeOrdens = resOrdens.data.content || resOrdens.data || [];
+          const listaDePessoas = resPessoas.data.content || resPessoas.data || [];
 
-        // 3. Formata o mês para o Português (Ex: "Abril de 2026")
-        const nomeMes = d.toLocaleString('pt-BR', { month: 'long' });
-        const textoMes = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1) + ' de ' + year;
-        setMesFormatado(textoMes);
+          // 2. Filtra as Ordens criadas HOJE usando a lista correta
+          const ordensHoje = Array.isArray(listaDeOrdens) 
+            ? listaDeOrdens.filter(o => o.dataRegisto === hoje)
+            : [];
+          // ----------------------
 
-        // 4. Atualiza os estados
-        setStats({
-          clientes: resPessoas.data.filter(p => p.tipo === 'CLIENTE').length,
-          funcionarios: resPessoas.data.filter(p => p.tipo === 'FUNCIONARIO').length,
-          faturamentoMes: resDash.data.faturamentoMes || 0,
-          osMes: resDash.data.osMes || 0,
-          osConcluidasMes: resDash.data.osConcluidasMes || 0,
-          
-          // Contadores de Hoje
-          ordensHojeTotal: ordensHoje.length,
-          hojeAbertas: ordensHoje.filter(o => o.status === 'ABERTA').length,
-          hojeConcluidas: ordensHoje.filter(o => o.status === 'CONCLUIDA').length,
-          hojeCanceladas: ordensHoje.filter(o => o.status === 'CANCELADA').length,
-        });
+          // 3. Formata o mês...
+          const nomeMes = d.toLocaleString('pt-BR', { month: 'long' });
+          const textoMes = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1) + ' de ' + year;
+          setMesFormatado(textoMes);
+
+          // 4. Atualiza os estados
+          setStats({
+            clientes: listaDePessoas.filter(p => p.tipo === 'CLIENTE').length,
+            funcionarios: listaDePessoas.filter(p => p.tipo === 'FUNCIONARIO').length,
+            faturamentoMes: resDash.data.faturamentoMes || 0,
+            osMes: resDash.data.osMes || 0,
+            osConcluidasMes: resDash.data.osConcluidasMes || 0,
+            
+            ordensHojeTotal: ordensHoje.length,
+            hojeAbertas: ordensHoje.filter(o => o.status === 'ABERTA').length,
+            hojeConcluidas: ordensHoje.filter(o => o.status === 'CONCLUIDA').length,
+            hojeCanceladas: ordensHoje.filter(o => o.status === 'CANCELADA').length,
+          });
 
       } catch (err) {
         console.error('Erro ao carregar dashboard', err);
@@ -71,6 +79,7 @@ export function DashboardPage({ setAbaAtiva }) {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
+      
       <p className="text-slate-500 font-medium animate-pulse">Carregando seu espaço de trabalho...</p>
     </div>
   );
@@ -124,33 +133,28 @@ export function DashboardPage({ setAbaAtiva }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         
-        {/* Coluna Principal - Esquerda (Agora é o Painel de HOJE) */}
+{/* Coluna Principal - Esquerda (Agora é o Painel de HOJE) */}
         <div className="lg:col-span-2 flex flex-col gap-8">
           
-          {/* SUPER PAINEL: Resumo de Hoje */}
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
-            
-            {/* Efeitos de Fundo Luminoso */}
-            <div className="absolute -right-10 -top-10 w-48 h-48 bg-blue-500 rounded-full blur-3xl opacity-20 group-hover:opacity-30 transition-opacity duration-700"></div>
-            <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-emerald-500 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity duration-700"></div>
-
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-white/10 pb-6">
+{/* SUPER PAINEL: Resumo de Hoje (Claro, levemente transparente e elegante) */}
+<div className="bg-slate-950 border border-slate-600 rounded-3xl p-8 text-white shadow-md">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-700 pb-6">
               <div>
                 <h3 className="text-2xl font-bold flex items-center gap-3">
-                  <div className="p-2 bg-white/10 rounded-lg backdrop-blur-md">
+                  <div className="p-2 bg-slate-700 rounded-lg">
                     <Calendar size={24} className="text-blue-300" />
                   </div>
                   Resumo de Hoje
                 </h3>
-                <p className="text-slate-400 mt-2 text-sm">Acompanhamento em tempo real do dia</p>
+                <p className="text-white/60 mt-2 text-sm">Acompanhamento em tempo real do dia</p>
               </div>
               <div className="mt-4 md:mt-0 text-left md:text-right">
                 <p className="text-5xl font-black text-white">{stats.ordensHojeTotal}</p>
-                <p className="text-blue-300 text-sm font-bold uppercase tracking-widest mt-1">Total de OS Hoje</p>
+                <p className="text-white/60 text-sm font-bold uppercase tracking-widest mt-1">Total de OS Hoje</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 relative z-10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Card Interno: Abertas */}
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md hover:bg-white/10 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
@@ -191,21 +195,21 @@ export function DashboardPage({ setAbaAtiva }) {
             </h3>
             <div className="flex flex-col gap-3">
               <QuickAction
-                onClick={() => setAbaAtiva('os')}
+                onClick={() => navigate('/ordens')}
                 title="Ir para Ordens de Serviço"
                 icon={<ClipboardList size={18} />}
                 color="text-blue-600"
                 bg="bg-blue-50"
               />
               <QuickAction
-                onClick={() => setAbaAtiva('pessoas')}
+                onClick={() => navigate('/pessoas')}
                 title="Gerenciar Clientes"
                 icon={<Users size={18} />}
                 color="text-emerald-600"
                 bg="bg-emerald-50"
               />
               <QuickAction
-                onClick={() => setAbaAtiva('relatorios')}
+                onClick={() => navigate('/relatorios')}
                 title="Acessar Relatórios"
                 icon={<FileText size={18} />}
                 color="text-purple-600"

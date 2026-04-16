@@ -1,13 +1,15 @@
 import { useState } from 'react';
-// APAGUEI o useNavigate daqui!
-import { Wrench, LogIn, Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Wrench, Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
 
-export function LoginPage() {
+// Recebemos a prop 'onLogin' que veio lá do App.jsx
+export function LoginPage({ onLogin }) {
   const [form, setForm] = useState({ login: '', senha: '' });
   const [erro, setErro] = useState('');
   const [loading, setLoading] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,11 +17,21 @@ export function LoginPage() {
     setLoading(true);
     try {
       const res = await api.post('/auth/login', form);
-      // Salva o token no navegador
-      localStorage.setItem('token', res.data.token);
+      const token = res.data.token;
       
-      // 👇 MAGIA AQUI: Recarrega a página para o App.jsx ler o token e abrir o sistema!
-      window.location.reload(); 
+      // 1. Salva o token
+      localStorage.setItem('token', token);
+      
+      // 2. Avisa a instância da API para usar o token agora mesmo
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      // 3. Avisa o App.jsx que o login deu certo! (Isso muda a rota magicamente)
+      if (onLogin) {
+        onLogin(token);
+      }
+      
+      // 4. Navega para a dashboard suavemente
+      navigate('/dashboard', { replace: true });
       
     } catch {
       setErro('Login ou senha incorretos.');
@@ -92,7 +104,7 @@ export function LoginPage() {
               {loading ? (
                 <span className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
               ) : (
-                <><LogIn size={20} /> Entrar</>
+                <>Entrar</>
               )}
             </button>
           </form>

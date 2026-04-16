@@ -1,64 +1,68 @@
-import React, { useState } from 'react';
-import { Sidebar } from './components/SideBar'; 
-import { OrdemServicoPage } from './pages/OrdemServicoPage'; 
-import { PessoaPage } from './pages/PessoaPage'; 
-import { ServicoPage } from './pages/ServicoPage'; 
-import { RelatorioPage } from './pages/RelatorioPage'; 
-import { ToastProvider } from './components/ToastProvider'; 
-import { ComissaoPage } from './pages/ComissaoPage';
+import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { ToastProvider } from './components/ToastProvider';
+import { ProtectedRoute } from './components/ProtectedRoute'; // Se não estiver usando, pode tirar
+import { limparTokenSeExpirado } from './utils/token';
+import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { FaturamentoPage } from './pages/FaturamentoPage';  
-import { LoginPage } from './pages/LoginPage'; 
+import { OrdemServicoPage } from './pages/OrdemServicoPage';
+import { PessoaPage } from './pages/PessoaPage';
+import { ServicoPage } from './pages/ServicoPage';
+import { FaturamentoPage } from './pages/FaturamentoPage';
+import { ComissaoPage } from './pages/ComissaoPage';
+import { RelatorioPage } from './pages/RelatorioPage';
+import { Sidebar } from './components/Sidebar';
+
+function AppLayout() {
+  return (
+    <div className="min-h-screen bg-slate-50/50 flex">
+      <Sidebar />
+      <main className="flex-1 ml-72 min-w-0">
+        <div className="p-8">
+          <Routes>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/ordens" element={<OrdemServicoPage />} />
+            <Route path="/pessoas" element={<PessoaPage />} />
+            <Route path="/catalogo" element={<ServicoPage />} />
+            <Route path="/faturamento" element={<FaturamentoPage />} />
+            <Route path="/comissoes" element={<ComissaoPage />} />
+            <Route path="/relatorios" element={<RelatorioPage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </div>
+      </main>
+    </div>
+  );
+}
 
 export default function App() {
-  const [abaAtiva, setAbaAtiva] = useState('os'); 
+  // 1. Transformamos o token em um Estado para o React "ouvir" as mudanças
+  const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Pega o token do navegador
-  const token = localStorage.getItem('token');
+  useEffect(() => {
+    limparTokenSeExpirado();
+    setToken(localStorage.getItem('token'));
+  }, []);
 
-  if (!token) {
-    return (
-      <ToastProvider>
-        <LoginPage /> 
-      </ToastProvider>
-    );
-  }
-
-  // Se tem token, renderiza o sistema por dentro
-  const renderizarPagina = () => {
-    switch (abaAtiva) {
-      case 'dashboard':
-        return <DashboardPage setAbaAtiva={setAbaAtiva} />;
-      case 'os':
-        return <OrdemServicoPage />;
-      case 'pessoas':
-        return <PessoaPage />;
-      case 'catalogo':
-        return <ServicoPage />;
-      case 'faturamento':
-        return <FaturamentoPage />;
-      case 'comissoes':
-        return <ComissaoPage />;
-      case 'relatorios':
-        return <RelatorioPage abaInicial={abaAtiva} />;
-      default:
-        return <OrdemServicoPage />;
-    }
+  // 2. Criamos uma função para atualizar o estado quando o usuário logar
+  const handleLogin = (novoToken) => {
+    setToken(novoToken);
   };
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-slate-50/50 flex">
+      <Routes>
+        {/* 3. Passamos a função handleLogin como "prop" para a LoginPage */}
+        <Route 
+          path="/login" 
+          element={token ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={handleLogin} />} 
+        />
         
-        <Sidebar abaAtiva={abaAtiva} setAbaAtiva={setAbaAtiva} />
-
-        <main className="flex-1 ml-72 min-w-0">
-          <div className="p-8">
-            {renderizarPagina()}
-          </div>
-        </main>
-        
-      </div>
+        <Route 
+          path="/*" 
+          element={token ? <AppLayout /> : <Navigate to="/login" replace />} 
+        />
+      </Routes>
     </ToastProvider>
   );
 }
