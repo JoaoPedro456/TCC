@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from './components/ToastProvider';
-import { ProtectedRoute } from './components/ProtectedRoute'; // Se não estiver usando, pode tirar
 import { limparTokenSeExpirado } from './utils/token';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -36,7 +35,7 @@ function AppLayout() {
 }
 
 export default function App() {
-  // 1. Transformamos o token em um Estado para o React "ouvir" as mudanças
+  // 1. Controle de estado do Token
   const [token, setToken] = useState(localStorage.getItem('token'));
 
   useEffect(() => {
@@ -44,7 +43,7 @@ export default function App() {
     setToken(localStorage.getItem('token'));
   }, []);
 
-  // 2. Criamos uma função para atualizar o estado quando o usuário logar
+  // 2. Atualiza o estado quando o usuário logar
   const handleLogin = (novoToken) => {
     setToken(novoToken);
   };
@@ -52,12 +51,13 @@ export default function App() {
   return (
     <ToastProvider>
       <Routes>
-        {/* 3. Passamos a função handleLogin como "prop" para a LoginPage */}
+        {/* Rota de Login */}
         <Route 
           path="/login" 
           element={token ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={handleLogin} />} 
         />
         
+        {/* Rotas Protegidas do Sistema (AppLayout) */}
         <Route 
           path="/*" 
           element={token ? <AppLayout /> : <Navigate to="/login" replace />} 
