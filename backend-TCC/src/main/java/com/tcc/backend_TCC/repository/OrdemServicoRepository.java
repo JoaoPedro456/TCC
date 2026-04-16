@@ -3,6 +3,8 @@ package com.tcc.backend_TCC.repository;
 import com.tcc.backend_TCC.enuns.StatusOS;
 import com.tcc.backend_TCC.model.OrdemServico;
 import com.tcc.backend_TCC.model.Pessoa;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +22,8 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
     List<OrdemServico> findByCliente(Pessoa cliente);
 
     List<OrdemServico> findByStatus(StatusOS status);
+
+    Page<OrdemServico> findByStatus(StatusOS status, Pageable pageable);
 
     List<OrdemServico> findByDataRegistoBetween(LocalDate inicio, LocalDate fim);
 

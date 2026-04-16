@@ -1,5 +1,6 @@
 package com.tcc.backend_TCC.service;
 
+import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
 import com.tcc.backend_TCC.model.ItemServico;
 import com.tcc.backend_TCC.repository.ItemServicoRepository;
 import jakarta.validation.Valid;
@@ -28,7 +29,7 @@ public class ItemServicoService {
 
     public ItemServico atualizar(Long id, @Valid ItemServico dados) {
             ItemServico servico = repository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
             servico.setNomeServico(dados.getNomeServico());
             servico.setPrecoTabela(dados.getPrecoTabela());
             return repository.save(servico);

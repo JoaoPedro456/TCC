@@ -1,5 +1,7 @@
 package com.tcc.backend_TCC.security;
 
+import com.tcc.backend_TCC.exception.OperacaoInvalidaException;
+import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
 import com.tcc.backend_TCC.model.Usuario;
 import com.tcc.backend_TCC.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,19 +22,18 @@ public class AuthService {
 
     public String login(String login, String senha) {
         Usuario usuario = usuarioRepository.findByLogin(login)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
         if (!passwordEncoder.matches(senha, usuario.getSenha())) {
-            throw new RuntimeException("Senha incorreta");
+            throw new OperacaoInvalidaException("Senha incorreta");
         }
 
-        // Passa a role do usuário para incluir no token
         return jwtService.gerarToken(login, usuario.getRole());
     }
 
     public Usuario registrar(String login, String senha, String role) {
         if (usuarioRepository.findByLogin(login).isPresent()) {
-            throw new RuntimeException("Login já existe");
+            throw new OperacaoInvalidaException("Login já existe");
         }
         Usuario u = new Usuario();
         u.setLogin(login);

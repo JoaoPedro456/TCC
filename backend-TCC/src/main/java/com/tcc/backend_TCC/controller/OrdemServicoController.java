@@ -1,5 +1,6 @@
 package com.tcc.backend_TCC.controller;
 
+import com.tcc.backend_TCC.enuns.StatusOS;
 import com.tcc.backend_TCC.model.OrdemServico;
 import com.tcc.backend_TCC.model.OrdemServicoDTO;
 import com.tcc.backend_TCC.service.ImpressaoService;
@@ -17,7 +18,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 
 @RestController
 @RequestMapping("/api/ordens")
@@ -32,12 +35,17 @@ public class OrdemServicoController {
 
     @PostMapping
     public ResponseEntity<OrdemServico> criar(@Valid @RequestBody OrdemServicoDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.salvarDTO(dto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.salvar(dto));
     }
 
     @GetMapping
-    public List<OrdemServico> listar() {
-        return service.listarTodas();
+    public Page<OrdemServico> listar(
+            @RequestParam(required = false) String status,
+            @PageableDefault(size = 20) Pageable pageable) {
+        if (status != null && !status.isBlank()) {
+            return service.listarPorStatus(StatusOS.valueOf(status), pageable);
+        }
+        return service.listarTodas(pageable);
     }
 
     @GetMapping("/{id}")

@@ -1,5 +1,6 @@
 package com.tcc.backend_TCC.service;
 
+import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
 import com.tcc.backend_TCC.enuns.StatusLancamento;
 import com.tcc.backend_TCC.enuns.StatusOS;
 import com.tcc.backend_TCC.enuns.TipoLancamento;
@@ -18,6 +19,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class OrdemServicoService {
@@ -39,22 +42,13 @@ public class OrdemServicoService {
     private LancamentoRepository lancamentoRepository;
 
     @Transactional
-    public OrdemServico salvar(OrdemServico os) {
-        if (os.getMecanicos() != null) {
-            for (OrdemServicoMecanico m : os.getMecanicos()) {
-                m.setOrdemServico(os);
-            }
-        }
-        return repository.save(os);
-    }
-
-    @Transactional
-    public OrdemServico salvarDTO(OrdemServicoDTO dto) {
+    public OrdemServico salvar(OrdemServicoDTO dto) {
         OrdemServico os = new OrdemServico();
 
+        // --- Dados básicos ---
         if (dto.getCliente() != null && dto.getCliente().getId() != null) {
             Pessoa cliente = pessoaRepository.findById(dto.getCliente().getId())
-                    .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente não encontrado"));
             os.setCliente(cliente);
         }
 
@@ -62,32 +56,36 @@ public class OrdemServicoService {
         os.setVeiculo(dto.getVeiculo());
         os.setQuilometragem(dto.getQuilometragem());
 
-        os.setValorKm(dto.getValorKm() != null ? dto.getValorKm() : BigDecimal.ZERO);
-        os.setValorTotal(dto.getValorTotal() != null ? dto.getValorTotal() : BigDecimal.ZERO);
+        BigDecimal valorKm = dto.getValorKm() != null ? dto.getValorKm() : BigDecimal.ZERO;
+        BigDecimal valorTotal = dto.getValorTotal() != null ? dto.getValorTotal() : BigDecimal.ZERO;
+
+        os.setValorKm(valorKm);
+        os.setValorTotal(valorTotal);
         os.setStatus(StatusOS.ABERTA);
 
+        // --- Itens do catálogo ---
         if (dto.getItensServicoIds() != null && !dto.getItensServicoIds().isEmpty()) {
             List<ItemServico> itens = itemServicoRepository.findAllById(dto.getItensServicoIds());
             os.setItensServico(itens);
         }
 
-        BigDecimal totalGeral = dto.getValorTotal();
-        BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
-        BigDecimal precoKm = dto.getValorKm() != null ? dto.getValorKm() : BigDecimal.ZERO;
+        // --- Mecânicos e cálculo de comissão ---
+        if (dto.getMecanicos() != null && !dto.getMecanicos().isEmpty()) {
+            BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
+            BigDecimal custoKm = qtdKm.multiply(valorKm);
+            BigDecimal valorApenasServico = valorTotal.subtract(custoKm);
 
-        BigDecimal custoKm = qtdKm.multiply(precoKm);
-        BigDecimal valorApenasServico = totalGeral.subtract(custoKm);
-
-        if (dto.getMecanicos() != null) {
             List<OrdemServicoMecanico> mecanicos = new ArrayList<>();
             for (var mDto : dto.getMecanicos()) {
+                Pessoa func = pessoaRepository.findById(mDto.getMecanico().getId())
+                        .orElseThrow(() -> new RecursoNaoEncontradoException("Mecânico não encontrado"));
+
                 OrdemServicoMecanico osm = new OrdemServicoMecanico();
                 osm.setOrdemServico(os);
-
-                Pessoa func = pessoaRepository.findById(mDto.getMecanico().getId()).orElseThrow();
                 osm.setMecanico(func);
 
-                BigDecimal porcentagem = BigDecimal.valueOf(func.getPercentualComissao() != null ? func.getPercentualComissao() : 0);
+                BigDecimal porcentagem = BigDecimal.valueOf(
+                        func.getPercentualComissao() != null ? func.getPercentualComissao() : 0);
 
                 BigDecimal valorComissao = valorApenasServico.multiply(porcentagem)
                         .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -98,21 +96,20 @@ public class OrdemServicoService {
             os.setMecanicos(mecanicos);
         }
 
-        os.setVeiculo(dto.getVeiculo());
-        os.setQuilometragem(dto.getQuilometragem());
-        os.setValorKm(dto.getValorKm());
-        os.setValorTotal(totalGeral);
-
         return repository.save(os);
     }
 
-    public List<OrdemServico> listarTodas() {
-        return repository.findAll();
+    public Page<OrdemServico> listarTodas(Pageable pageable) {
+        return repository.findAll(pageable);
+    }
+
+    public Page<OrdemServico> listarPorStatus(StatusOS status, Pageable pageable) {
+        return repository.findByStatus(status, pageable);
     }
 
     public OrdemServico buscarPorId(Long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("OS não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("OS não encontrada"));
     }
 
     // 👇 2. A MÁGICA ACONTECE AQUI

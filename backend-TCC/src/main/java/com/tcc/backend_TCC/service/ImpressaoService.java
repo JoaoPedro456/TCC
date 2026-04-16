@@ -7,6 +7,7 @@ import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
 import com.tcc.backend_TCC.model.OrdemServico;
 import com.tcc.backend_TCC.model.OrdemServicoMecanico;
 import com.tcc.backend_TCC.model.Pessoa;
@@ -45,7 +46,7 @@ public class ImpressaoService {
 
     public byte[] gerarPdfOs(Long osId) throws Exception {
         OrdemServico os = osRepository.findById(osId)
-                .orElseThrow(() -> new RuntimeException("OS não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("OS não encontrada"));
 
         Document document = new Document(PageSize.A4, 36, 36, 36, 36);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

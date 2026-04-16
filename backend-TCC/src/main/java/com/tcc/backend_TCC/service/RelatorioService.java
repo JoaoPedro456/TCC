@@ -1,5 +1,6 @@
 package com.tcc.backend_TCC.service;
 
+import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
 import com.tcc.backend_TCC.model.OrdemServico;
 import com.tcc.backend_TCC.model.Pessoa;
 import com.tcc.backend_TCC.model.TipoPessoa;
@@ -34,7 +35,7 @@ public class RelatorioService {
 
     public Map<String, Object> relatorioFuncionario(Long id, LocalDate inicio, LocalDate fim) {
         Pessoa funcionario = pessoaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionário não encontrado"));
 
         // Tratando nulo caso o repository retorne vazio
         BigDecimal totalComissao = zeroSeNulo(mecanicoRepository.totalComissaoPorMecanicoEPeriodo(id, inicio, fim));
