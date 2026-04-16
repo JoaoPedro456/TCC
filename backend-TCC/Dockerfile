@@ -1,10 +1,15 @@
-FROM maven:3.8.5-openjdk-17 AS build
+FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
-COPY . .
-RUN mvn clean package -DskipTests
 
-FROM openjdk:17-jdk-slim
-WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
+# Copia os arquivos de configuração do Maven primeiro
+COPY .mvn/ .mvn
+COPY mvnw pom.xml ./
+RUN ./mvnw dependency:go-offline
+
+# Copia o código e compila
+COPY src ./src
+RUN ./mvnw clean package -DskipTests
+
+# Executa o JAR
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "target/*.jar"]
