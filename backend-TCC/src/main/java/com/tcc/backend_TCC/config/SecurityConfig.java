@@ -17,7 +17,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.List; // Importação essencial que faltava
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
@@ -33,12 +33,12 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
+                        // Rota do H2-Console removida para forçar o uso do banco oficial
                         .requestMatchers(HttpMethod.GET, "/api/pessoa/**").permitAll()
                         .requestMatchers("/api/auth/registrar").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
-                .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+                // Liberação de frames (usada pelo H2) removida para maior segurança
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -49,7 +49,6 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // A MÁGICA ESTÁ AQUI: O asterisco com OriginPatterns libera QUALQUER link da Vercel
         configuration.setAllowedOriginPatterns(List.of("*"));
 
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
