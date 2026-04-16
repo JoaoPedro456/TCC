@@ -2,18 +2,16 @@ package com.tcc.backend_TCC.controller;
 
 import com.tcc.backend_TCC.model.Usuario;
 import com.tcc.backend_TCC.security.AuthService;
-import jakarta.validation.constraints.NotBlank;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-@Validated
+@CrossOrigin(origins = "*") // Libera para qualquer um chamar esse controller
 public class AuthController {
 
     @Autowired
@@ -25,27 +23,14 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("token", token));
     }
 
-    /**
-     * Cria novo usuário (apenas ADMIN pode acessar este endpoint)
-     * POST /api/auth/registrar
-     * Body: { "login": "...", "senha": "...", "role": "ADMIN|OPERADOR" }
-     */
     @PostMapping("/registrar")
-    public ResponseEntity<Usuario> registrar(
-            @RequestBody Map<String, String> body) {
+    public ResponseEntity<Usuario> registrar(@RequestBody Map<String, String> body) {
         String login = body.get("login");
         String senha = body.get("senha");
         String role = body.get("role");
 
-        // Validação manual dos campos obrigatórios
-        if (login == null || login.isBlank()) {
-            throw new IllegalArgumentException("Login é obrigatório");
-        }
-        if (senha == null || senha.isBlank()) {
-            throw new IllegalArgumentException("Senha é obrigatória");
-        }
-        if (role == null || role.isBlank()) {
-            throw new IllegalArgumentException("Role é obrigatória");
+        if (login == null || login.isBlank() || senha == null || senha.isBlank() || role == null || role.isBlank()) {
+            return ResponseEntity.badRequest().build();
         }
 
         Usuario usuario = authService.registrar(login, senha, role);
