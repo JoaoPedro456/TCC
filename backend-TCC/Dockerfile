@@ -1,9 +1,14 @@
 FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
 
-# Copia os arquivos de configuração do Maven primeiro
+# Copia os arquivos de configuração do Maven
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
+
+# CORREÇÃO: Dá permissão de execução para o arquivo do Maven
+RUN chmod +x mvnw
+
+# Baixa as dependências
 RUN ./mvnw dependency:go-offline
 
 # Copia o código e compila
