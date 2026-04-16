@@ -1,20 +1,13 @@
-FROM eclipse-temurin:17-jdk-jammy
+# Estágio de Build
+FROM maven:3.8.5-openjdk-17 AS build
 WORKDIR /app
+COPY . .
+# Usamos 'mvn' direto em vez do './mvnw' para evitar problemas de permissão/wrapper
+RUN mvn clean package -DskipTests
 
-# Copia os arquivos de configuração do Maven
-COPY .mvn/ .mvn
-COPY mvnw pom.xml ./
-
-# CORREÇÃO: Dá permissão de execução para o arquivo do Maven
-RUN chmod +x mvnw
-
-# Baixa as dependências
-RUN ./mvnw dependency:go-offline
-
-# Copia o código e compila
-COPY src ./src
-RUN ./mvnw clean package -DskipTests
-
-# Executa o JAR
+# Estágio de Execução
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "target/*.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
