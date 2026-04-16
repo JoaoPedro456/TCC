@@ -2,20 +2,18 @@ package com.tcc.backend_TCC.service;
 
 import com.tcc.backend_TCC.enuns.StatusOS;
 import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
-import com.tcc.backend_TCC.model.*;
-import com.tcc.backend_TCC.repository.ItemServicoRepository;
-import com.tcc.backend_TCC.repository.LancamentoRepository;
-import com.tcc.backend_TCC.repository.OrdemServicoMecanicoRepository;
-import com.tcc.backend_TCC.repository.OrdemServicoRepository;
-import com.tcc.backend_TCC.repository.PessoaRepository;
+import com.tcc.backend_TCC.model.OrdemServico;
+import com.tcc.backend_TCC.model.OrdemServicoDTO;
+import com.tcc.backend_TCC.model.Pessoa;
+import com.tcc.backend_TCC.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -174,7 +172,7 @@ class OrdemServicoServiceTest {
 
         when(osRepository.findAll()).thenReturn(List.of(os1, os2));
 
-        List<OrdemServico> resultado = service.listarTodas();
+        List<OrdemServico> resultado = (List<OrdemServico>) service.listarTodas(Pageable.unpaged());
 
         assertEquals(2, resultado.size());
     }
