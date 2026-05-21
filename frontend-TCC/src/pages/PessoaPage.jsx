@@ -11,55 +11,144 @@ export function PessoaPage() {
   const [filtroTipo, setFiltroTipo] = useState('TODOS');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    nome: '', cpf: '', telefone: '', endereco: '',
-    tipo: 'CLIENTE', cargo: '', percentualComissao: '', salarioBase: ''
+    nome: '', tipo: 'CLIENTE', tipoPessoaFisica: true, cpf: '', cnpj: '', telefone: '',
+    cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+    cargo: '', percentualComissao: '', salarioBase: ''
   });
   
   const { success, error } = useToast();
 
   // 1. Funções de formatação (Máscaras)
   const formatarCPF = (valor) => {
+    if (!valor) return '';
     return valor
-      .replace(/\D/g, '') // Remove tudo o que não é número
-      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca ponto entre o 3º e o 4º dígito
-      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca ponto entre o 6º e o 7º dígito
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2') // Coloca hífen entre o 9º e o 10º dígito
-      .replace(/(-\d{2})\d+?$/, '$1'); // Impede a digitação de mais de 14 caracteres
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  };
+
+  const formatarCNPJ = (valor) => {
+    if (!valor) return '';
+    return valor
+      .replace(/\D/g, '')
+      .replace(/^(\d{2})(\d)/, '$1.$2')
+      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1/$2')
+      .replace(/(\d{4})(\d)/, '$1-$2')
+      .replace(/(\d{2})\d+?$/, '$1');
   };
 
   const formatarTelefone = (valor) => {
+    if (!valor) return '';
     return valor
-      .replace(/\D/g, '') // Remove tudo o que não é número
-      .replace(/(\d{2})(\d)/, '($1) $2') // Coloca parênteses no DDD
-      .replace(/(\d{4,5})(\d{4})/, '$1-$2') // Coloca hífen
-      .replace(/(-\d{4})\d+?$/, '$1'); // Impede a digitação de mais de 15 caracteres
+      .replace(/\D/g, '')
+      .replace(/^(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{5})(\d)/, '$1-$2')
+      .replace(/(-\d{4})\d+?$/, '$1');
   };
 
+  const formatarCEP = (valor) => {
+    if (!valor) return '';
+    return valor.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2').slice(0, 9);
+  };
+
+  const buscarCEP = async (cep) => {
+    const limpo = cep.replace(/\D/g, '');
+    if (limpo.length !== 8) return;
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${limpo}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          logradouro: data.logradouro || '',
+          bairro: data.bairro || '',
+          cidade: data.localidade || '',
+          estado: data.uf || ''
+        }));
+      }
+    } catch (err) {
+      console.error("Erro ao buscar CEP", err);
+    }
+  };
+
+  const validarCPF = (cpf) => {
+    cpf = cpf.replace(/\D/g, '');
+    if(cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+    let soma = 0, resto;
+    for (let i = 1; i <= 9; i++) soma = soma + parseInt(cpf.substring(i-1, i)) * (11 - i);
+    resto = (soma * 10) % 11;
+    if ((resto == 10) || (resto == 11)) resto = 0;
+    if (resto != parseInt(cpf.substring(9, 10)) ) return false;
+    soma = 0;
+    for (let i = 1; i <= 10; i++) soma = soma + parseInt(cpf.substring(i-1, i)) * (12 - i);
+    resto = (soma * 10) % 11;
+    if ((resto == 10) || (resto == 11)) resto = 0;
+    if (resto != parseInt(cpf.substring(10, 11) ) ) return false;
+    return true;
+  };
+
+  const validarCNPJ = (cnpj) => {
+    cnpj = cnpj.replace(/\D/g, '');
+    if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false;
+    let tamanho = cnpj.length - 2;
+    let numeros = cnpj.substring(0, tamanho);
+    let digitos = cnpj.substring(tamanho);
+    let soma = 0, pos = tamanho - 7;
+    for (let i = tamanho; i >= 1; i--) {
+      soma += numeros.charAt(tamanho - i) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+    if (resultado != digitos.charAt(0)) return false;
+    tamanho = tamanho + 1;
+    numeros = cnpj.substring(0, tamanho);
+    soma = 0; pos = tamanho - 7;
+    for (let i = tamanho; i >= 1; i--) {
+      soma += numeros.charAt(tamanho - i) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+    if (resultado != digitos.charAt(1)) return false;
+    return true;
+  };
+
+  // 2. Função para carregar dados da API
   const carregar = async () => {
     try {
       const res = await api.get('/pessoa');
       setPessoas(res.data);
     } catch (err) {
       console.error('Erro ao carregar pessoas:', err);
-      error('Não foi possível carregar os dados do servidor.');
+      error('Erro ao carregar dados do servidor.');
     }
   };
 
-  useEffect(() => { 
-    carregar(); 
+  useEffect(() => {
+    carregar();
   }, []);
 
-  const handleEditar = (pessoa) => {
-    setIdEdicao(pessoa.id); 
+  // 3. Função para abrir modal de edição
+  const handleEditar = (p) => {
+    setIdEdicao(p.id);
     setFormData({
-      nome: pessoa.nome || '',
-      cpf: pessoa.cpf || '',
-      telefone: pessoa.telefone || '',
-      endereco: pessoa.endereco || '',
-      tipo: pessoa.tipo || 'CLIENTE',
-      cargo: pessoa.cargo || '',
-      percentualComissao: pessoa.percentualComissao || '',
-      salarioBase: pessoa.salarioBase || ''
+      nome: p.nome || '',
+      tipo: p.tipo || 'CLIENTE',
+      tipoPessoaFisica: p.cnpj ? false : true,
+      cpf: p.cpf || '',
+      cnpj: p.cnpj || '',
+      telefone: p.telefone || '',
+      cep: p.cep || '',
+      logradouro: p.logradouro || '',
+      numero: p.numero || '',
+      complemento: p.complemento || '',
+      bairro: p.bairro || '',
+      cidade: p.cidade || '',
+      estado: p.estado || '',
+      cargo: p.cargo || '',
+      percentualComissao: p.percentualComissao || '',
+      salarioBase: p.salarioBase || ''
     });
     setModalAberto(true);
   };
@@ -67,19 +156,31 @@ export function PessoaPage() {
   const fecharModal = () => {
     setModalAberto(false);
     setIdEdicao(null);
-    setFormData({ 
-      nome: '', cpf: '', telefone: '', endereco: '', 
-      tipo: 'CLIENTE', cargo: '', percentualComissao: '', salarioBase: '' 
-    });
+    setFormData({ nome: '', tipo: 'CLIENTE', tipoPessoaFisica: true, cpf: '', cnpj: '', telefone: '',
+      cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+      cargo: '', percentualComissao: '', salarioBase: '' });
   };
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (formData.tipoPessoaFisica && formData.cpf && !validarCPF(formData.cpf)) {
+      error('CPF inválido!');
+      return;
+    }
+    if (!formData.tipoPessoaFisica && formData.cnpj && !validarCNPJ(formData.cnpj)) {
+      error('CNPJ inválido!');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const payload = { 
         ...formData,
+        cpf: formData.tipoPessoaFisica ? formData.cpf : null,
+        cnpj: !formData.tipoPessoaFisica ? formData.cnpj : null,
         percentualComissao: formData.tipo === 'FUNCIONARIO' ? parseFloat(formData.percentualComissao || 0) : 0,
         salarioBase: formData.tipo === 'FUNCIONARIO' ? parseFloat(formData.salarioBase || 0) : 0
       };
@@ -120,7 +221,7 @@ export function PessoaPage() {
     const matchTipo = filtroTipo === 'TODOS' || p.tipo === filtroTipo;
     const matchBusca = !busca || 
       p.nome?.toLowerCase().includes(busca.toLowerCase()) || 
-      p.cpf?.includes(busca);
+      p.cpf?.includes(busca) || p.cnpj?.includes(busca);
     return matchTipo && matchBusca;
   });
 
@@ -170,28 +271,49 @@ export function PessoaPage() {
           <thead className="bg-[#F9FAFB] border-b border-slate-200">
             <tr>
               <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Nome</th>
-              <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Tipo</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Documento</th>
               <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Contato</th>
-              <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Detalhes</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Endereço</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Profissional</th>
               <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide text-center w-32">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {listaFiltrada.map(p => (
               <tr key={p.id} className="hover:bg-slate-50/50 transition">
-                <td className="px-5 py-3.5 font-semibold text-slate-900">{p.nome}</td>
                 <td className="px-5 py-3.5">
-                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${
-                    p.tipo === 'CLIENTE' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                  }`}>
-                    {p.tipo === 'CLIENTE' ? 'Cliente' : 'Funcionário'}
-                  </span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-bold text-slate-900">{p.nome}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium border uppercase tracking-wider ${
+                      p.tipo === 'CLIENTE' ? 'bg-slate-50 text-slate-500 border-slate-200' : 'bg-slate-800 text-white border-slate-800'
+                    }`}>
+                      {p.tipo === 'CLIENTE' ? 'Cliente' : 'Funcionário'}
+                    </span>
+                  </div>
                 </td>
+                <td className="px-5 py-3.5 text-sm text-slate-500 font-mono text-[13px] tracking-tight">{p.cpf || p.cnpj || '—'}</td>
                 <td className="px-5 py-3.5 text-sm text-slate-500">{p.telefone || '—'}</td>
-                <td className="px-5 py-3.5 text-sm text-slate-500">
-                  {p.tipo === 'FUNCIONARIO'
-                    ? <span className="text-slate-700">{p.cargo || '—'} • {p.percentualComissao || 0}%</span>
-                    : p.cpf || '—'}
+                <td className="px-5 py-3.5 text-sm">
+                  {p.logradouro || p.cidade ? (
+                    <div className="flex flex-col">
+                      <span className="text-slate-700 font-medium">{p.logradouro}{p.numero ? `, ${p.numero}` : ''}</span>
+                      <span className="text-[11px] text-slate-400 mt-0.5">
+                        {[p.bairro, p.cidade ? `${p.cidade}${p.estado ? `/${p.estado}` : ''}` : null].filter(Boolean).join(' • ')}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </td>
+                <td className="px-5 py-3.5 text-sm">
+                  {p.tipo === 'FUNCIONARIO' ? (
+                    <div className="flex flex-col">
+                      <span className="text-slate-700 font-medium">{p.cargo || '—'}</span>
+                      <span className="text-[11px] text-slate-400 mt-0.5">Comissão: <span className="text-emerald-600 font-bold">{p.percentualComissao || 0}%</span></span>
+                    </div>
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
                 </td>
                 <td className="px-5 py-3.5 text-center flex justify-center gap-4">
                    <button 
@@ -211,7 +333,7 @@ export function PessoaPage() {
             ))}
             {listaFiltrada.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-slate-400 text-sm">
+                <td colSpan={6} className="px-5 py-12 text-center text-slate-400 text-sm">
                   Nenhum registro encontrado no Banco de Dados.
                 </td>
               </tr>
@@ -240,8 +362,18 @@ export function PessoaPage() {
                 required 
               />
               
+              <div className="flex gap-4 items-center px-1">
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                  <input type="radio" checked={formData.tipoPessoaFisica} onChange={() => setFormData({...formData, tipoPessoaFisica: true, cnpj: ''})} className="w-4 h-4 text-blue-600" />
+                  Pessoa Física
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                  <input type="radio" checked={!formData.tipoPessoaFisica} onChange={() => setFormData({...formData, tipoPessoaFisica: false, cpf: ''})} className="w-4 h-4 text-blue-600" />
+                  Pessoa Jurídica
+                </label>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
-                {/* 3. Inputs com formatação aplicada em tempo real e maxLength */}
                 <input 
                   placeholder="Telefone" 
                   value={formData.telefone}
@@ -249,21 +381,81 @@ export function PessoaPage() {
                   className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
                   onChange={e => setFormData({ ...formData, telefone: formatarTelefone(e.target.value) })} 
                 />
-                <input 
-                  placeholder="CPF" 
-                  value={formData.cpf}
-                  maxLength="14"
-                  className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-                  onChange={e => setFormData({ ...formData, cpf: formatarCPF(e.target.value) })} 
-                />
+                {formData.tipoPessoaFisica ? (
+                  <input 
+                    placeholder="CPF *" 
+                    value={formData.cpf}
+                    maxLength="14"
+                    className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    onChange={e => setFormData({ ...formData, cpf: formatarCPF(e.target.value) })} 
+                    required
+                  />
+                ) : (
+                  <input 
+                    placeholder="CNPJ *" 
+                    value={formData.cnpj}
+                    maxLength="18"
+                    className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    onChange={e => setFormData({ ...formData, cnpj: formatarCNPJ(e.target.value) })} 
+                    required
+                  />
+                )}
               </div>
 
-              <input 
-                placeholder="Endereço" 
-                value={formData.endereco}
-                className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-                onChange={e => setFormData({ ...formData, endereco: e.target.value })} 
-              />
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Endereço Completo</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <input 
+                    placeholder="CEP" 
+                    value={formData.cep}
+                    maxLength="9"
+                    className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    onChange={e => setFormData({ ...formData, cep: formatarCEP(e.target.value) })} 
+                    onBlur={() => buscarCEP(formData.cep)}
+                  />
+                  <input 
+                    placeholder="Logradouro (Rua, Av.)" 
+                    value={formData.logradouro}
+                    className="w-full col-span-2 border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    onChange={e => setFormData({ ...formData, logradouro: e.target.value })} 
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <input 
+                    placeholder="Número" 
+                    value={formData.numero}
+                    className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    onChange={e => setFormData({ ...formData, numero: e.target.value })} 
+                  />
+                  <input 
+                    placeholder="Complemento" 
+                    value={formData.complemento}
+                    className="w-full col-span-2 border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    onChange={e => setFormData({ ...formData, complemento: e.target.value })} 
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <input 
+                    placeholder="Bairro" 
+                    value={formData.bairro}
+                    className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    onChange={e => setFormData({ ...formData, bairro: e.target.value })} 
+                  />
+                  <input 
+                    placeholder="Cidade" 
+                    value={formData.cidade}
+                    className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    onChange={e => setFormData({ ...formData, cidade: e.target.value })} 
+                  />
+                  <input 
+                    placeholder="UF" 
+                    value={formData.estado}
+                    maxLength="2"
+                    className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition uppercase"
+                    onChange={e => setFormData({ ...formData, estado: e.target.value.toUpperCase() })} 
+                  />
+                </div>
+              </div>
 
               <select 
                 className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition bg-white"

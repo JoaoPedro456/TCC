@@ -1,0 +1,60 @@
+import { useEffect, useState } from 'react';
+import api from '../services/api';
+import { UserPlus, Trash2, X, Search, PenIcon } from 'lucide-react';
+import { useToast } from '../components/ToastProvider.jsx';
+
+export function PessoaPage() {
+  const [pessoas, setPessoas] = useState([]);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [idEdicao, setIdEdicao] = useState(null);
+  const [busca, setBusca] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('TODOS');
+  const [loading, setLoading] = useState(false);
+
+  const [formData, setFormData] = useState({
+    nome: '', tipo: 'CLIENTE', cpf: '', cnpj: '', telefone: '',
+    endereco: '', bairro: '', numero: '', cidade: '', distrito: '',
+    cargo: '', percentualComissao: '', salarioBase: ''
+  });
+
+  const { success, error } = useToast();
+
+  const formatarCPF = (valor) => {
+    if (!valor) return '';
+    return valor.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
+  };
+
+  const formatarCNPJ = (valor) => {
+    if (!valor) return '';
+    return valor.replace(/\D/g, '').replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
+  };
+
+  const formatarTelefone = (valor) => {
+    if (!valor) return '';
+    return valor.replace(/\D/g, '').replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{4,5})(\d{4})/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1');
+  };
+
+  const carregar = async () => {
+    try {
+      const res = await api.get('/pessoa');
+      setPessoas(res.data);
+    } catch (err) {
+      console.error('Erro ao carregar pessoas:', err);
+      error('Não foi possível carregar os dados do servidor.');
+    }
+  };
+
+  useEffect(() => { carregar(); }, []);
+
+  const handleEditar = (pessoa) => {
+    setIdEdicao(pessoa.id);
+    setFormData({
+      nome: pessoa.nome || '', tipo: pessoa.tipo || 'CLIENTE',
+      cpf: pessoa.cpf || '', cnpj: pessoa.cnpj || '',
+      telefone: pessoa.telefone || '', endereco: pessoa.endereco || '',
+      bairro: pessoa.bairro || '', numero: pessoa.numero || '',
+      cidade: pessoa.cidade || '', distrito: pessoa.distrito || '',
+      cargo: pessoa.cargo || '', percentualComissao: pessoa.percentualComissao || '', salarioBase: pessoa.salarioBase || ''
+    });
+    setModalAberto(true);
+  };

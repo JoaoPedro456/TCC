@@ -22,7 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
 # Ambiente / Variáveis Locais
-.env
+.env              ← Local com localhost (NÃO SUBIR)
 .env.local
 .env.*.local
+
+# Frontend
+node_modules/
+dist/
