@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -35,7 +34,16 @@ public class PessoaController {
 
     @PostMapping
     public ResponseEntity<Pessoa> criar(@Valid @RequestBody Pessoa p) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.salvar(p));
+        System.out.println("[PessoaController] RECEBEU REQUISICAO POST! Dados: " + p);
+        try {
+            Pessoa salva = service.salvar(p);
+            System.out.println("[PessoaController] PESSOA SALVA COM SUCESSO! ID: " + salva.getId());
+            return ResponseEntity.status(HttpStatus.CREATED).body(salva);
+        } catch (Exception e) {
+            System.err.println("[PessoaController] ERRO AO SALVAR: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @PutMapping("/{id}")

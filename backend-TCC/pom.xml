@@ -92,6 +92,13 @@
             <version>1.3.30</version>
         </dependency>
 
+        <!-- Rate Limiting - Bucket4j (versão correta do Maven Central) -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+
         <!-- Testes -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

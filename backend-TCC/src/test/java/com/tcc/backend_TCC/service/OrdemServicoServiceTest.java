@@ -122,8 +122,8 @@ class OrdemServicoServiceTest {
         assertNotNull(resultado.getMecanicos());
         assertEquals(1, resultado.getMecanicos().size());
         assertEquals("Carlos", resultado.getMecanicos().get(0).getMecanico().getNome());
-        // 10% de 200 = 20
-        assertEquals(BigDecimal.valueOf(20.0), resultado.getMecanicos().get(0).getValorAtribuido());
+        // 10% de 200 = 20 (usando compareTo para ignorar escala)
+        assertEquals(0, BigDecimal.valueOf(20.0).compareTo(resultado.getMecanicos().get(0).getValorAtribuido()));
     }
 
     @Test
@@ -170,10 +170,10 @@ class OrdemServicoServiceTest {
         OrdemServico os2 = new OrdemServico();
         os2.setId(2L);
 
-        when(osRepository.findAll()).thenReturn(List.of(os1, os2));
+        when(osRepository.findAll(any(Pageable.class))).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(os1, os2)));
 
-        List<OrdemServico> resultado = (List<OrdemServico>) service.listarTodas(Pageable.unpaged());
+        var resultado = service.listarTodas(Pageable.unpaged());
 
-        assertEquals(2, resultado.size());
+        assertEquals(2, resultado.getContent().size());
     }
 }

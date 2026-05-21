@@ -5,6 +5,8 @@ import com.tcc.backend_TCC.enuns.StatusOS;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,11 +15,16 @@ import java.util.List;
 
 @Entity
 @Data
+@SQLDelete(sql = "UPDATE ordem_servico SET ativo = false WHERE id=?")
+@SQLRestriction("ativo = true")
 public class OrdemServico {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private Boolean ativo = true;
 
     @NotNull(message = "Cliente é obrigatório")
     @ManyToOne

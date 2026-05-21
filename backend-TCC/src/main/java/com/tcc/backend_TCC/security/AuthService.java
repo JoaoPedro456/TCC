@@ -41,4 +41,17 @@ public class AuthService {
         u.setRole(role != null ? role : "OPERADOR");
         return usuarioRepository.save(u);
     }
+
+    // Methods for security testing
+    public String generateTestToken(String login, String role) {
+        return jwtService.gerarToken(login, role);
+    }
+
+    public boolean validateTestToken(String token) {
+        return jwtService.tokenValido(token);
+    }
+    
+    public String extractUsernameTest(String token) {
+        return jwtService.extrairLogin(token);
+    }
 }

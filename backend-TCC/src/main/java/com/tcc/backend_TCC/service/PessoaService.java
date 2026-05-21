@@ -32,17 +32,22 @@ public class PessoaService {
 
     public Pessoa atualizar(Long id, Pessoa pAtualizada) {
         Pessoa pExistente = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pessoa não encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pessoa nao encontrada"));
 
-        // Garante que o ID da pessoa que estamos a validar é o correto
         pAtualizada.setId(id);
         validarDuplicidades(pAtualizada);
 
-        // Atualiza os dados
         pExistente.setNome(pAtualizada.getNome());
         pExistente.setCpf(pAtualizada.getCpf());
+        pExistente.setCnpj(pAtualizada.getCnpj());
         pExistente.setTelefone(pAtualizada.getTelefone());
-        pExistente.setEndereco(pAtualizada.getEndereco());
+        pExistente.setCep(pAtualizada.getCep());
+        pExistente.setLogradouro(pAtualizada.getLogradouro());
+        pExistente.setBairro(pAtualizada.getBairro());
+        pExistente.setNumero(pAtualizada.getNumero());
+        pExistente.setComplemento(pAtualizada.getComplemento());
+        pExistente.setCidade(pAtualizada.getCidade());
+        pExistente.setEstado(pAtualizada.getEstado());
         pExistente.setTipo(pAtualizada.getTipo());
         pExistente.setCargo(pAtualizada.getCargo());
         pExistente.setSalarioBase(pAtualizada.getSalarioBase());
@@ -53,30 +58,28 @@ public class PessoaService {
 
     public void excluir(Long id) {
         if (!repository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Pessoa não encontrada");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Pessoa nao encontrada");
         }
         repository.deleteById(id);
     }
 
-    // ==========================================
-    // MÉTODO DE VALIDAÇÃO DE DUPLICIDADE
-    // ==========================================
     private void validarDuplicidades(Pessoa pessoa) {
-
-        // 1. Validar CPF
         if (pessoa.getCpf() != null && !pessoa.getCpf().trim().isEmpty()) {
-            Optional<Pessoa> pessoaExistente = repository.findByCpf(pessoa.getCpf());
-
-            // Se o CPF já existir e NÃO for da própria pessoa que estamos a editar
+            Optional<Pessoa> pessoaExistente = repository.findByCpfIncludingDeleted(pessoa.getCpf());
             if (pessoaExistente.isPresent() && !pessoaExistente.get().getId().equals(pessoa.getId())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este CPF já está cadastrado no sistema!");
             }
         }
 
-        // 2. Validar Telefone
-        if (pessoa.getTelefone() != null && !pessoa.getTelefone().trim().isEmpty()) {
-            Optional<Pessoa> pessoaExistente = repository.findByTelefone(pessoa.getTelefone());
+        if (pessoa.getCnpj() != null && !pessoa.getCnpj().trim().isEmpty()) {
+            Optional<Pessoa> pessoaExistente = repository.findByCnpjIncludingDeleted(pessoa.getCnpj());
+            if (pessoaExistente.isPresent() && !pessoaExistente.get().getId().equals(pessoa.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este CNPJ já está cadastrado no sistema!");
+            }
+        }
 
+        if (pessoa.getTelefone() != null && !pessoa.getTelefone().trim().isEmpty()) {
+            Optional<Pessoa> pessoaExistente = repository.findByTelefoneIncludingDeleted(pessoa.getTelefone());
             if (pessoaExistente.isPresent() && !pessoaExistente.get().getId().equals(pessoa.getId())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este Telefone já está cadastrado no sistema!");
             }

@@ -102,7 +102,7 @@ public class ImpressaoService {
         addInfoRow(tCliente, "Cliente:", safe(os.getCliente() != null ? os.getCliente().getNome() : null),
                 "CPF:",     safe(os.getCliente() != null ? os.getCliente().getCpf() : null));
         addInfoRow(tCliente, "Telefone:", safe(os.getCliente() != null ? os.getCliente().getTelefone() : null),
-                "Endereço:", safe(os.getCliente() != null ? os.getCliente().getEndereco() : null));
+                "Endereço:", safe(os.getCliente() != null ? os.getCliente().getLogradouro() : null));
 
         document.add(tCliente);
         document.add(spacer(35f));

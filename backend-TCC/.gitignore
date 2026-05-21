@@ -13,6 +13,11 @@ target/
 .springBeans
 .sts4-cache
 
+# Arquivos de configuração local com senhas
+application-dev.properties     ← ✅ IGNORA (tem senha)
+# application.properties       ← ✅ REMOVIDO (DEVE ser commitado!)
+*.env
+
 ### IntelliJ IDEA ###
 .idea
 *.iws
