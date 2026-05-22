@@ -1,0 +1,46 @@
+name: Supabase Database Backup
+
+on:
+  schedule:
+    # Executa todos os dias às 03:00 UTC (00:00 Horário de Brasília)
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Permite que você clique em um botão no GitHub para rodar manualmente o backup quando quiser
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Instalar Cliente do PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Configurar Carimbo de Data/Hora (Timestamp)
+        id: timestamp
+        run: echo "TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+
+      - name: Fazer o Backup do Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "Erro: A Secret SUPABASE_DB_URL não foi configurada no repositório."
+            exit 1
+          fi
+          
+          echo "Iniciando o backup do banco de dados..."
+          
+          # O pg_dump exporta todo o banco.
+          # Usamos --clean para adicionar comandos de DROP TABLE antes de criar, facilitando a restauração
+          # Usamos --if-exists para evitar erros caso a tabela não exista ao fazer o DROP
+          # Usamos --no-owner e --no-privileges para evitar problemas de permissão ao restaurar
+          
+          pg_dump "$SUPABASE_DB_URL" --clean --if-exists --no-owner --no-privileges > backup_tcc_${{ env.TIMESTAMP }}.sql
+          
+          echo "Backup concluído com sucesso."
+
+      - name: Salvar o Arquivo de Backup no GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-backup-tcc-${{ env.TIMESTAMP }}
+          path: backup_tcc_${{ env.TIMESTAMP }}.sql
+          retention-days: 90 # O arquivo será guardado gratuitamente por 90 dias
