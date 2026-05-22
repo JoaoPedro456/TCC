@@ -39,7 +39,7 @@ jobs:
           # Usamos --if-exists para evitar erros caso a tabela não exista ao fazer o DROP
           # Usamos --no-owner e --no-privileges para evitar problemas de permissão ao restaurar
           
-          pg_dump "$SUPABASE_DB_URL" --clean --if-exists --no-owner --no-privileges > backup_tcc_${{ env.TIMESTAMP }}.sql
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --clean --if-exists --no-owner --no-privileges > backup_tcc_${{ env.TIMESTAMP }}.sql
           
           echo "Backup concluído com sucesso."
 
