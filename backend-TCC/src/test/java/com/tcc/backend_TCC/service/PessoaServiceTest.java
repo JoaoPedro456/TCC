@@ -1,7 +1,7 @@
 package com.tcc.backend_TCC.service;
 
 import com.tcc.backend_TCC.model.Pessoa;
-import com.tcc.backend_TCC.model.TipoPessoa;
+import com.tcc.backend_TCC.enuns.TipoPessoa;
 import com.tcc.backend_TCC.repository.PessoaRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,7 +50,7 @@ class PessoaServiceTest {
         existente.setId(1L);
         existente.setCpf("12345678900");
 
-        when(repository.findByCpf("12345678900")).thenReturn(Optional.of(existente));
+        when(repository.findByCpfIncludingDeleted("12345678900")).thenReturn(Optional.of(existente));
 
         assertThrows(ResponseStatusException.class, () -> service.salvar(pessoa));
     }

@@ -6,6 +6,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.Date;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -22,8 +24,8 @@ public class JwtSecurityTest {
     @Test
     @DisplayName("1. Validate correct token")
     void testValidateCorrectToken() {
-        String token = jwtService.generateToken("user", "USER");
-        assertTrue(jwtService.validateToken(token),
+        String token = jwtService.gerarToken("user", "USER");
+        assertTrue(jwtService.tokenValido(token),
                 "Valid token should pass validation");
     }
 
@@ -31,25 +33,25 @@ public class JwtSecurityTest {
     @DisplayName("2. Extract username from token")
     void testExtractUsername() {
         String username = "testuser";
-        String token = jwtService.generateToken(username, "USER");
-        assertEquals(username, jwtService.extractUsername(token),
+        String token = jwtService.gerarToken(username, "USER");
+        assertEquals(username, jwtService.extrairLogin(token),
                 "Extracted username should match");
     }
 
     @Test
     @DisplayName("3. Token should have expiration")
     void testTokenHasExpiration() {
-        String token = jwtService.generateToken("user", "USER");
-        assertNotNull(jwtService.extractExpiration(token),
+        String token = jwtService.gerarToken("user", "USER");
+        assertNotNull(jwtService.extrairExpiracao(token),
                 "Token should have expiration date");
     }
 
     @Test
     @DisplayName("4. Tampered token should be invalid")
     void testTamperedToken() {
-        String token = jwtService.generateToken("user", "USER");
+        String token = jwtService.gerarToken("user", "USER");
         String tamperedToken = token.substring(0, 10) + "X" + token.substring(11);
-        assertFalse(jwtService.validateToken(tamperedToken),
+        assertFalse(jwtService.tokenValido(tamperedToken),
                 "Tampered token should be invalid");
     }
 
@@ -57,38 +59,38 @@ public class JwtSecurityTest {
     @DisplayName("5. Expired token should be invalid")
     void testExpiredToken() {
         String username = "user";
-        String token = jwtService.generateToken(username, "USER");
+        String token = jwtService.gerarToken(username, "USER");
 
-        assertNotNull(jwtService.extractExpiration(token),
+        assertNotNull(jwtService.extrairExpiracao(token),
                 "Token should have expiration");
     }
 
     @Test
     @DisplayName("6. Empty token should be invalid")
     void testEmptyToken() {
-        assertFalse(jwtService.validateToken(""),
+        assertFalse(jwtService.tokenValido(""),
                 "Empty token should be invalid");
     }
 
     @Test
     @DisplayName("7. Null token should be invalid")
     void testNullToken() {
-        assertFalse(jwtService.validateToken(null),
+        assertFalse(jwtService.tokenValido(null),
                 "Null token should be invalid");
     }
 
     @Test
     @DisplayName("8. Malformed token should be invalid")
     void testMalformedToken() {
-        assertFalse(jwtService.validateToken("not-a-jwt-token"),
+        assertFalse(jwtService.tokenValido("not-a-jwt-token"),
                 "Malformed token should be invalid");
     }
 
     @Test
     @DisplayName("9. Token with wrong signature should be invalid")
     void testWrongSignature() {
-        String token1 = jwtService.generateToken("user1", "USER");
-        String token2 = jwtService.generateToken("user2", "USER");
+        String token1 = jwtService.gerarToken("user1", "USER");
+        String token2 = jwtService.gerarToken("user2", "USER");
         assertNotEquals(token1, token2,
                 "Different tokens should have different signatures");
     }
@@ -96,15 +98,15 @@ public class JwtSecurityTest {
     @Test
     @DisplayName("10. Token contains correct role")
     void testTokenRole() {
-        String token = jwtService.generateToken("admin", "ADMIN");
-        assertTrue(jwtService.validateToken(token),
+        String token = jwtService.gerarToken("admin", "ADMIN");
+        assertTrue(jwtService.tokenValido(token),
                 "Admin token should be valid");
     }
 
     @Test
     @DisplayName("11. Very old token structure")
     void testTokenStructure() {
-        String token = jwtService.generateToken("user", "USER");
+        String token = jwtService.gerarToken("user", "USER");
         String[] parts = token.split("\\.");
         assertEquals(3, parts.length,
                 "JWT should have 3 parts");
@@ -115,8 +117,8 @@ public class JwtSecurityTest {
     @Test
     @DisplayName("12. Token for different users different")
     void testTokensForDifferentUsers() {
-        String token1 = jwtService.generateToken("user1", "USER");
-        String token2 = jwtService.generateToken("user2", "USER");
+        String token1 = jwtService.gerarToken("user1", "USER");
+        String token2 = jwtService.gerarToken("user2", "USER");
         assertNotEquals(token1, token2,
                 "Tokens for different users should be different");
     }

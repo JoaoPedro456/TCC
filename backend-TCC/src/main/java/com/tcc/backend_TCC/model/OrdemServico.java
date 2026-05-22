@@ -54,14 +54,8 @@ public class OrdemServico {
     @Enumerated(EnumType.STRING)
     private StatusOS status = StatusOS.ABERTA;
 
-    @ManyToMany
-    @JoinTable(
-            name = "os_itens_servico",
-            joinColumns = @JoinColumn(name = "ordem_servico_id"),
-            inverseJoinColumns = @JoinColumn(name = "item_servico_id")
-    )
-    @JsonIgnore
-    private List<ItemServico> itensServico = new ArrayList<>();
+    @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<OrdemServicoItem> itensServico = new ArrayList<>();
 
     @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore

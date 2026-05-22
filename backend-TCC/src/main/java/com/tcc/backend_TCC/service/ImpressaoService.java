@@ -9,6 +9,7 @@ import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
 import com.tcc.backend_TCC.model.OrdemServico;
+import com.tcc.backend_TCC.model.OrdemServicoItem;
 import com.tcc.backend_TCC.model.OrdemServicoMecanico;
 import com.tcc.backend_TCC.model.Pessoa;
 import com.tcc.backend_TCC.repository.OrdemServicoMecanicoRepository;
@@ -180,8 +181,8 @@ public class ImpressaoService {
             // 1. Adiciona os Serviços do Catálogo
             if (temServicos) {
                 for (var item : os.getItensServico()) {
-                    tSvc.addCell(styledCell(safe(item.getNomeServico()), Element.ALIGN_LEFT));
-                    tSvc.addCell(styledCell("R$ " + String.format("%.2f", item.getPrecoTabela()).replace(".", ","), Element.ALIGN_CENTER));
+                    tSvc.addCell(styledCell(safe(item.getItemServico() != null ? item.getItemServico().getNomeServico() : "Serviço"), Element.ALIGN_LEFT));
+                    tSvc.addCell(styledCell("R$ " + String.format("%.2f", item.getPrecoCobrado() != null ? item.getPrecoCobrado() : BigDecimal.ZERO).replace(".", ","), Element.ALIGN_CENTER));
                 }
             }
 

@@ -31,7 +31,7 @@ public class OrdemServicoDTO {
     @DecimalMin(value = "0.0", message = "Valor total não pode ser negativo")
     private BigDecimal valorTotal;
 
-    private List<Long> itensServicoIds;
+    private List<OrdemServicoItemDTO> itensServico;
 
     @NotEmpty(message = "É necessário associar pelo menos um mecânico")
     private List<MecanicoDTO> mecanicos;
@@ -47,5 +47,15 @@ public class OrdemServicoDTO {
         @NotNull(message = "Mecânico é obrigatório")
         @Valid
         private ClienteDTO mecanico;
+    }
+
+    @Data
+    public static class OrdemServicoItemDTO {
+        @NotNull(message = "ID do serviço é obrigatório")
+        private Long itemServicoId;
+
+        @NotNull(message = "Preço cobrado é obrigatório")
+        @DecimalMin(value = "0.0", message = "Preço cobrado não pode ser negativo")
+        private BigDecimal precoCobrado;
     }
 }

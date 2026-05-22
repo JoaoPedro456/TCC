@@ -62,11 +62,11 @@ public class SecurityAuditTest {
         
         assertNotNull(token, "Token should not be null");
         assertFalse(token.isEmpty(), "Token should not be empty");
-        assertTrue(token.split("\.").length == 3,
+        assertTrue(token.split("\\.").length == 3,
                 "JWT should have 3 parts separated by dots");
         
         // Token should start with typical JWT pattern
-        assertTrue(token.matches("^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$"),
+        assertTrue(token.matches("^[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+$"),
                 "Token should match JWT format");
     }
 

@@ -54,6 +54,8 @@ public class SecurityConfigHardened {
             )
             // Authorization - Role-based with method security
             .authorizeHttpRequests(auth -> auth
+                // Allow preflight CORS requests
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Public endpoints
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/registrar").hasRole("ADMIN")
@@ -126,10 +128,15 @@ public class SecurityConfigHardened {
         // Exemplo: CORS_ALLOWED_ORIGINS=https://meusistema.vercel.app,http://localhost:5173
         String allowedOrigins = System.getenv("CORS_ALLOWED_ORIGINS");
         if (allowedOrigins != null && !allowedOrigins.isBlank()) {
-            configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+            // Split the comma‑separated list and trim each entry
+            java.util.List<String> origins = java.util.Arrays.stream(allowedOrigins.split(","))
+                    .map(java.lang.String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(java.util.stream.Collectors.toList());
+            configuration.setAllowedOrigins(origins);
         } else {
             // Fallback para desenvolvimento local
-            configuration.setAllowedOriginPatterns(List.of("http://localhost:*"));
+            configuration.setAllowedOriginPatterns(java.util.List.of("http://localhost:*"));
         }
         configuration.setAllowedMethods(List.of(
             "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"

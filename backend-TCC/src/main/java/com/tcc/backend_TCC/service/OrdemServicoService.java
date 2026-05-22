@@ -64,8 +64,18 @@ public class OrdemServicoService {
         os.setStatus(StatusOS.ABERTA);
 
         // --- Itens do catálogo ---
-        if (dto.getItensServicoIds() != null && !dto.getItensServicoIds().isEmpty()) {
-            List<ItemServico> itens = itemServicoRepository.findAllById(dto.getItensServicoIds());
+        if (dto.getItensServico() != null && !dto.getItensServico().isEmpty()) {
+            List<OrdemServicoItem> itens = new ArrayList<>();
+            for (var itemDto : dto.getItensServico()) {
+                ItemServico catalogItem = itemServicoRepository.findById(itemDto.getItemServicoId())
+                        .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço do catálogo não encontrado: " + itemDto.getItemServicoId()));
+
+                OrdemServicoItem osItem = new OrdemServicoItem();
+                osItem.setOrdemServico(os);
+                osItem.setItemServico(catalogItem);
+                osItem.setPrecoCobrado(itemDto.getPrecoCobrado());
+                itens.add(osItem);
+            }
             os.setItensServico(itens);
         }
 

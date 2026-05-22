@@ -44,6 +44,7 @@ public class JwtService {
         return Jwts.builder()
                 .subject(login)
                 .claim("role", role)  // Armazena a role como claim
+                .claim("jti", java.util.UUID.randomUUID().toString()) // Unique token identifier to prevent session fixation / duplication
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + EXPIRACAO))
                 .signWith(getKey())
@@ -81,10 +82,43 @@ public class JwtService {
 
     public boolean tokenValido(String token) {
         try {
+            if (token == null || token.trim().isEmpty()) {
+                return false;
+            }
             extrairLogin(token);
             return true;
-        } catch (JwtException e) {
+        } catch (Exception e) {
             return false;
+        }
+    }
+
+    public Date extrairExpiracao(String token) {
+        return Jwts.parser()
+                .verifyWith(getKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getExpiration();
+    }
+
+    // Compatibility methods for tests
+    public String generateToken(String login, String role) {
+        return gerarToken(login, role);
+    }
+    public boolean validateToken(String token) {
+        return tokenValido(token);
+    }
+    public String extractUsername(String token) {
+        return extrairLogin(token);
+    }
+    public Date extractExpiration(String token) {
+        return extrairExpiracao(token);
+    }
+    public boolean isTokenExpired(String token) {
+        try {
+            return extrairExpiracao(token).before(new Date());
+        } catch (Exception e) {
+            return true;
         }
     }
 }

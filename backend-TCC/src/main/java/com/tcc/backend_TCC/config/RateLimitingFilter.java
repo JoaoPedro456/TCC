@@ -36,6 +36,12 @@ public class RateLimitingFilter implements Filter {
 
         log.debug("Requisicao recebida: {} {} | IP: {}", method, requestUri, clientIp);
 
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            // Preflight request: just let it pass through without rate limiting
+            chain.doFilter(request, response);
+            return;
+        }
+
         try {
             boolean isLoginEndpoint = isLoginRequest(requestUri, method);
 

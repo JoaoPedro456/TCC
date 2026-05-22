@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -18,6 +19,11 @@ public class RateLimitingTest {
 
     @Autowired
     private RateLimitingService rateLimitingService;
+
+    @BeforeEach
+    void setUp() {
+        rateLimitingService.clearAll();
+    }
 
     @Test
     @DisplayName("1. Rate limit service should be available")

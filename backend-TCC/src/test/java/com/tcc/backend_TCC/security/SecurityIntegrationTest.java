@@ -1,9 +1,11 @@
 package com.tcc.backend_TCC.security;
 
 import com.tcc.backend_TCC.model.Pessoa;
+import com.tcc.backend_TCC.enuns.TipoPessoa;
 import com.tcc.backend_TCC.repository.PessoaRepository;
-import com.tcc.backend_TCC.service.AuthService;
+import com.tcc.backend_TCC.security.AuthService;
 import com.tcc.backend_TCC.service.RateLimitingService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,11 @@ public class SecurityIntegrationTest {
 
     @Autowired
     private PessoaRepository pessoaRepository;
+
+    @BeforeEach
+    void setUp() {
+        rateLimitingService.clearAll();
+    }
 
     @Test
     @DisplayName("1. Brute force attack simulation")
@@ -61,8 +68,8 @@ public class SecurityIntegrationTest {
         usuario.setNome("Test User");
         usuario.setCpf("111.222.333-44");
         usuario.setTelefone("(11) 99999-9999");
-        usuario.setEndereco("Rua A");
-        usuario.setTipo("FUNCIONARIO");
+        usuario.setLogradouro("Rua A");
+        usuario.setTipo(TipoPessoa.FUNCIONARIO);
         usuario.setCargo("Teste");
         usuario.setSalarioBase(1000.0);
         usuario.setPercentualComissao(5.0);
@@ -129,8 +136,8 @@ public class SecurityIntegrationTest {
         pessoa.setNome("Secure User");
         pessoa.setCpf("555.666.777-88");
         pessoa.setTelefone("(11) 91234-5678");
-        pessoa.setEndereco("Rua Segura, 123");
-        pessoa.setTipo("FUNCIONARIO");
+        pessoa.setLogradouro("Rua Segura, 123");
+        pessoa.setTipo(TipoPessoa.FUNCIONARIO);
         pessoa.setCargo("Analista");
         pessoa.setSalarioBase(3000.0);
         pessoa.setPercentualComissao(8.0);
@@ -188,8 +195,8 @@ public class SecurityIntegrationTest {
         pessoa.setNome(maliciousUsername);
         pessoa.setCpf("999.888.777-66");
         pessoa.setTelefone("(11) 99999-9999");
-        pessoa.setEndereco("Rua Teste");
-        pessoa.setTipo("CLIENTE");
+        pessoa.setLogradouro("Rua Teste");
+        pessoa.setTipo(TipoPessoa.CLIENTE);
 
         // JPA should handle this safely
         Pessoa saved = pessoaRepository.save(pessoa);
@@ -206,8 +213,8 @@ public class SecurityIntegrationTest {
         pessoa.setNome(xssPayload);
         pessoa.setCpf("111.111.111-11");
         pessoa.setTelefone("(11) 99999-9999");
-        pessoa.setEndereco("Rua X");
-        pessoa.setTipo("CLIENTE");
+        pessoa.setLogradouro("Rua X");
+        pessoa.setTipo(TipoPessoa.CLIENTE);
 
         Pessoa saved = pessoaRepository.save(pessoa);
         assertEquals(xssPayload, saved.getNome(),
@@ -225,15 +232,15 @@ public class SecurityIntegrationTest {
         usuario.setNome("Escalator");
         usuario.setCpf("222.333.444-55");
         usuario.setTelefone("(11) 99999-9999");
-        usuario.setEndereco("Rua Esc");
-        usuario.setTipo("CLIENTE");
+        usuario.setLogradouro("Rua Esc");
+        usuario.setTipo(TipoPessoa.CLIENTE);
         // Attempting to set admin fields as client
         usuario.setCargo(null);
         usuario.setSalarioBase(0.0);
         usuario.setPercentualComissao(0.0);
 
         Pessoa saved = pessoaRepository.save(usuario);
-        assertEquals("CLIENTE", saved.getTipo(),
+        assertEquals(TipoPessoa.CLIENTE, saved.getTipo(),
                 "Type should remain as set");
     }
 
