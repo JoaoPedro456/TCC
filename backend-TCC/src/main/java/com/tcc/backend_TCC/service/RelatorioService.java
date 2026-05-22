@@ -3,7 +3,7 @@ package com.tcc.backend_TCC.service;
 import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
 import com.tcc.backend_TCC.model.OrdemServico;
 import com.tcc.backend_TCC.model.Pessoa;
-import com.tcc.backend_TCC.model.TipoPessoa;
+import com.tcc.backend_TCC.enuns.TipoPessoa;
 import com.tcc.backend_TCC.repository.OrdemServicoMecanicoRepository;
 import com.tcc.backend_TCC.repository.OrdemServicoRepository;
 import com.tcc.backend_TCC.repository.PessoaRepository;
@@ -124,6 +124,27 @@ public class RelatorioService {
         dash.put("ticketMedio", ticketMedio);
         dash.put("totalClientes", totalClientes);
         dash.put("totalFuncionarios", totalFuncionarios);
+
+        // --- Adicionando Histórico de Faturamento dos últimos 6 meses ---
+        List<Map<String, Object>> historicoFaturamento = new ArrayList<>();
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("MMM", new Locale("pt", "BR"));
+        for (int i = 5; i >= 0; i--) {
+            LocalDate inicioMes = hoje.minusMonths(i).withDayOfMonth(1);
+            LocalDate fimMes = hoje.minusMonths(i).withDayOfMonth(hoje.minusMonths(i).lengthOfMonth());
+            
+            // Só considera OS concluídas
+            BigDecimal fatMes = zeroSeNulo(ordemServicoRepository.totalFaturadoPorPeriodo(inicioMes, fimMes));
+            
+            Map<String, Object> dadosMes = new HashMap<>();
+            String nomeMes = inicioMes.format(formatter);
+            // Capitaliza a primeira letra (ex: "jan" -> "Jan")
+            nomeMes = nomeMes.substring(0, 1).toUpperCase() + nomeMes.substring(1);
+            
+            dadosMes.put("mes", nomeMes);
+            dadosMes.put("faturamento", fatMes);
+            historicoFaturamento.add(dadosMes);
+        }
+        dash.put("historicoFaturamento", historicoFaturamento);
 
         return dash;
     }

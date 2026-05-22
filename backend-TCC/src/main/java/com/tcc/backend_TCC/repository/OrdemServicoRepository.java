@@ -49,8 +49,6 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
            "  COUNT(CASE WHEN os.status = 'CONCLUIDA' THEN 1 END), " +
            "  COUNT(CASE WHEN os.status = 'ABERTA' THEN 1 END), " +
            "  COUNT(CASE WHEN os.status = 'CANCELADA' THEN 1 END), " +
-           "  COUNT(CASE WHEN os.status = 'EM_SERVICO' THEN 1 END), " +
-           "  COUNT(CASE WHEN os.status = 'AGUARDANDO_PECA' THEN 1 END), " +
            "  COUNT(CASE WHEN os.dataRegisto = :hoje THEN 1 END) " +
            "FROM OrdemServico os " +
            "WHERE os.dataRegisto BETWEEN :inicio AND :fim")

@@ -56,14 +56,14 @@ public class SecurityConfigHardened {
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/registrar").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/registrar").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
 
                 // Admin endpoints - restricted
                 .requestMatchers(HttpMethod.POST, "/api/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/**").hasRole("ADMIN")
 
-                // H2 Console - only in dev
+                // H2 Console - only in dev (or consider removing completely)
                 .requestMatchers("/h2-console/**").permitAll()
 
                 // Financeiro - authenticated
@@ -122,11 +122,15 @@ public class SecurityConfigHardened {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // In production, replace with specific allowed origins
-        // configuration.setAllowedOrigins(List.of("https://yourdomain.com"));
-
-        // For development, allow all but with restrictions
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        // Em produção, configure CORS_ALLOWED_ORIGINS como variável de ambiente
+        // Exemplo: CORS_ALLOWED_ORIGINS=https://meusistema.vercel.app,http://localhost:5173
+        String allowedOrigins = System.getenv("CORS_ALLOWED_ORIGINS");
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+        } else {
+            // Fallback para desenvolvimento local
+            configuration.setAllowedOriginPatterns(List.of("http://localhost:*"));
+        }
         configuration.setAllowedMethods(List.of(
             "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
         ));

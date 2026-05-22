@@ -29,7 +29,7 @@ public class OrdemServicoMecanico {
         if (this.mecanico != null && this.valorAtribuido != null) {
             Double percentual = this.mecanico.getPercentualComissao();
             if (percentual != null && percentual > 0) {
-                BigDecimal taxa = new BigDecimal(percentual).divide(new BigDecimal("100"));
+                BigDecimal taxa = new BigDecimal(percentual).divide(new BigDecimal("100"), 4, java.math.RoundingMode.HALF_UP);
                 this.valorComissao = this.valorAtribuido.multiply(taxa);
             } else {
                 this.valorComissao = BigDecimal.ZERO;

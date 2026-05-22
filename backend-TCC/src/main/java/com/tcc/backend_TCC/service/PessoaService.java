@@ -1,7 +1,7 @@
 package com.tcc.backend_TCC.service;
 
 import com.tcc.backend_TCC.model.Pessoa;
-import com.tcc.backend_TCC.model.TipoPessoa;
+import com.tcc.backend_TCC.enuns.TipoPessoa;
 import com.tcc.backend_TCC.repository.PessoaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

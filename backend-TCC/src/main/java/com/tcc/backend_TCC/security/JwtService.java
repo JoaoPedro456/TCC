@@ -14,13 +14,21 @@ import java.util.Date;
 @Service
 public class JwtService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtService.class);
+
     private final String SECRET;
     private final long EXPIRACAO;
 
     @Autowired
     public JwtService(Environment env) {
-        // L� do application.properties (ou vari�vel de ambiente JWT_SECRET)
-        this.SECRET = env.getProperty("jwt.secret", "bazani-mecanica-tcc-secret-key-2024-default");
+        // Lê do application.properties (ou variável de ambiente JWT_SECRET)
+        this.SECRET = env.getProperty("jwt.secret");
+        if (this.SECRET == null || this.SECRET.isBlank()) {
+            throw new IllegalStateException("JWT_SECRET não configurado! Configure a variável de ambiente JWT_SECRET.");
+        }
+        if (this.SECRET.length() < 32) {
+            throw new IllegalStateException("JWT_SECRET muito curto! Mínimo de 32 caracteres.");
+        }
         String expStr = env.getProperty("jwt.expiration", "39600000");
         this.EXPIRACAO = Long.parseLong(expStr);
     }

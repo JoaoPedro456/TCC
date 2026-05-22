@@ -4,6 +4,8 @@ import com.tcc.backend_TCC.service.RateLimitingService;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -11,10 +13,12 @@ import java.io.IOException;
 
 /**
  * Filter de Rate Limiting.
- * Intercepta TODAS as requisições antes de chegar nos controllers.
+ * Intercepta TODAS as requisicoes antes de chegar nos controllers.
  */
 @Component
 public class RateLimitingFilter implements Filter {
+
+    private static final Logger log = LoggerFactory.getLogger(RateLimitingFilter.class);
 
     @Autowired
     private RateLimitingService rateLimitingService;
@@ -30,25 +34,24 @@ public class RateLimitingFilter implements Filter {
         String requestUri = httpRequest.getRequestURI();
         String method = httpRequest.getMethod();
 
-        // LOG DE DEBUG: Mostra que o filtro foi acionado
-        System.out.println("[RateLimitingFilter] Requisição recebida: " + method + " " + requestUri + " | IP: " + clientIp);
+        log.debug("Requisicao recebida: {} {} | IP: {}", method, requestUri, clientIp);
 
         try {
-            // Verifica se é endpoint de LOGIN
             boolean isLoginEndpoint = isLoginRequest(requestUri, method);
 
             if (isLoginEndpoint) {
-                // Login tem tratamento especial (mais restritivo)
                 handleLoginRateLimit(httpRequest, httpResponse, chain, clientIp);
             } else {
-                // API geral (limite padrão)
                 handleGeneralRateLimit(httpRequest, httpResponse, chain, clientIp);
             }
         } catch (Exception e) {
-            // Em caso de erro no filtro, NÃO bloqueia a requisição (fail-open)
-            System.err.println("[RateLimitingFilter] ERRO NO FILTRO: " + e.getMessage());
-            e.printStackTrace();
-            chain.doFilter(request, response);
+            // Fail-closed: em caso de erro no filtro, BLOQUEIA a requisicao por seguranca
+            log.error("Erro no filtro de rate limiting. Bloqueando requisicao por seguranca.", e);
+            httpResponse.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            httpResponse.setContentType("application/json");
+            httpResponse.getWriter().write(
+                    "{\"error\": \"Servico temporariamente indisponivel. Tente novamente em instantes.\"}"
+            );
         }
     }
 
@@ -65,8 +68,7 @@ public class RateLimitingFilter implements Filter {
 
         if (!rateLimitingService.isLoginAllowed(clientIp, username)) {
             long retryAfter = rateLimitingService.getLoginRetryAfterSeconds(clientIp, username);
-
-            System.out.println("[RateLimitingFilter] LOGIN BLOQUEADO! IP: " + clientIp);
+            log.warn("LOGIN BLOQUEADO! IP: {}", clientIp);
 
             response.setStatus(429);
             response.setContentType("application/json");
@@ -85,35 +87,25 @@ public class RateLimitingFilter implements Filter {
                                         FilterChain chain, String clientIp)
             throws IOException, ServletException {
 
-        // LOG DE DEBUG: Mostra se está verificando o limite
-        System.out.println("[RateLimitingFilter] Verificando limite geral para: " + request.getRequestURI());
-
         if (!rateLimitingService.isAllowed(clientIp)) {
-            System.out.println("[RateLimitingFilter] REQUISIÇÃO BLOQUEADA (Rate Limit Exceeded)! IP: " + clientIp);
+            log.warn("Requisicao BLOQUEADA (Rate Limit Exceeded)! IP: {}", clientIp);
 
             response.setStatus(429);
             response.setContentType("application/json");
             response.getWriter().write(
-                    "{\"error\": \"Rate limit exceeded\", \"message\": \"Muitas requisições. Tente novamente em 1 minuto.\"}"
+                    "{\"error\": \"Rate limit exceeded\", \"message\": \"Muitas requisicoes. Tente novamente em 1 minuto.\"}"
             );
             return;
         }
 
-        System.out.println("[RateLimitingFilter] Requisição PERMITIDA. Passando para o Controller.");
         chain.doFilter(request, response);
     }
 
     private String extractUsernameFromRequest(HttpServletRequest request) {
         String username = request.getHeader("X-Login-Username");
-        if (username != null) {
-            return username;
-        }
-        return null;
+        return username;
     }
 
-    /**
-     * Extrai o IP real do cliente (considerando proxies e normalizando localhost)
-     */
     private String getClientIp(HttpServletRequest request) {
         String xfHeader = request.getHeader("X-Forwarded-For");
         String ip;
@@ -124,7 +116,6 @@ public class RateLimitingFilter implements Filter {
             ip = request.getRemoteAddr();
         }
 
-        // Normaliza IPv6 localhost para IPv4 padrão
         if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
             return "127.0.0.1";
         }

@@ -37,5 +37,5 @@ public interface OrdemServicoMecanicoRepository extends JpaRepository<OrdemServi
             "WHERE osm.mecanico.id = :mecanicoId " +
             "AND osm.ordemServico.status = 'CONCLUIDA' " +
             "AND osm.ordemServico.dataRegisto BETWEEN :inicio AND :fim")
-    List<OrdemServicoMecanico> buscarComissoesMes(Long mecanicoId, LocalDate inicio, LocalDate fim);
+    List<OrdemServicoMecanico> buscarComissoesMes(@Param("mecanicoId") Long mecanicoId, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 }

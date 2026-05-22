@@ -3,6 +3,7 @@ package com.tcc.backend_TCC.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import com.tcc.backend_TCC.enuns.TipoPessoa;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 

@@ -1,7 +1,7 @@
 package com.tcc.backend_TCC.repository;
 
 import com.tcc.backend_TCC.model.Pessoa;
-import com.tcc.backend_TCC.model.TipoPessoa;
+import com.tcc.backend_TCC.enuns.TipoPessoa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

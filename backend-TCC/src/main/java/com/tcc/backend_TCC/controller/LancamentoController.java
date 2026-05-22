@@ -1,9 +1,8 @@
 package com.tcc.backend_TCC.controller;
 
-import com.tcc.backend_TCC.enuns.StatusLancamento;
 import com.tcc.backend_TCC.enuns.TipoLancamento;
 import com.tcc.backend_TCC.model.Lancamento;
-import com.tcc.backend_TCC.repository.LancamentoRepository;
+import com.tcc.backend_TCC.service.LancamentoService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -14,37 +13,40 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/financeiro")
-@CrossOrigin(origins = "*")
 public class LancamentoController {
 
     @Autowired
-    private LancamentoRepository repository;
+    private LancamentoService service;
 
     @GetMapping("/receber")
     public List<Lancamento> listarReceber() {
-        return repository.findByTipoOrderByVencimentoAsc(TipoLancamento.RECEBER);
+        return service.listarPorTipo(TipoLancamento.RECEBER);
     }
 
     @GetMapping("/pagar")
     public List<Lancamento> listarPagar() {
-        return repository.findByTipoOrderByVencimentoAsc(TipoLancamento.PAGAR);
+        return service.listarPorTipo(TipoLancamento.PAGAR);
     }
 
     @PostMapping
     public ResponseEntity<Lancamento> criar(@Valid @RequestBody Lancamento lancamento) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(repository.save(lancamento));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.criar(lancamento));
     }
 
     @PutMapping("/{id}/status")
     public Lancamento atualizarStatus(@PathVariable Long id, @RequestParam String status) {
-        Lancamento lancamento = repository.findById(id).orElseThrow();
-        lancamento.setStatus(StatusLancamento.valueOf(status));
-        return repository.save(lancamento);
+        return service.atualizarStatus(id, status);
+    }
+
+    @PutMapping("/status-lote")
+    public ResponseEntity<Void> atualizarStatusEmLote(@RequestBody List<Long> ids, @RequestParam String status) {
+        service.atualizarStatusEmLote(ids, status);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
-        repository.deleteById(id);
+        service.excluir(id);
         return ResponseEntity.noContent().build();
     }
 }

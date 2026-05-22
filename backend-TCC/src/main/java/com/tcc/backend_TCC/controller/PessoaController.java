@@ -1,9 +1,11 @@
 package com.tcc.backend_TCC.controller;
 
 import com.tcc.backend_TCC.model.Pessoa;
-import com.tcc.backend_TCC.model.TipoPessoa;
+import com.tcc.backend_TCC.enuns.TipoPessoa;
 import com.tcc.backend_TCC.service.PessoaService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/pessoa")
 public class PessoaController {
+
+    private static final Logger log = LoggerFactory.getLogger(PessoaController.class);
 
     @Autowired
     private PessoaService service;
@@ -34,16 +38,10 @@ public class PessoaController {
 
     @PostMapping
     public ResponseEntity<Pessoa> criar(@Valid @RequestBody Pessoa p) {
-        System.out.println("[PessoaController] RECEBEU REQUISICAO POST! Dados: " + p);
-        try {
-            Pessoa salva = service.salvar(p);
-            System.out.println("[PessoaController] PESSOA SALVA COM SUCESSO! ID: " + salva.getId());
-            return ResponseEntity.status(HttpStatus.CREATED).body(salva);
-        } catch (Exception e) {
-            System.err.println("[PessoaController] ERRO AO SALVAR: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.info("Recebida requisicao para criar pessoa: {}", p.getNome());
+        Pessoa salva = service.salvar(p);
+        log.info("Pessoa salva com sucesso! ID: {}", salva.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(salva);
     }
 
     @PutMapping("/{id}")
