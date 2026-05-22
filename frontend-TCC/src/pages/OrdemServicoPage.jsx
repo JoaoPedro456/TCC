@@ -22,6 +22,7 @@ export function OrdemServicoPage() {
   const [buscaServico, setBuscaServico] = useState('');
   const [paginaServicos, setPaginaServicos] = useState(1);
   const servicosPorPagina = 8;
+  const [filtroCatalogo, setFiltroCatalogo] = useState('TODOS');
   const [paginaOS, setPaginaOS] = useState(0);
   const [totalPaginasOS, setTotalPaginasOS] = useState(1);
   const [totalElementos, setTotalElementos] = useState(0);
@@ -36,10 +37,18 @@ export function OrdemServicoPage() {
     valorKm: '',      // Preço cobrado por KM
     valorServico: '', // Preço cobrado pela mão de obra/peças
     valorTotal: 0,    // Calculado automaticamente
-    itensServicoIds: [],
+    itensServico: [],
     mecanicos: [],
   };
   const [form, setForm] = useState(formInicial);
+
+  const fecharModal = () => {
+    setModalAberto(false);
+    setForm(formInicial);
+    setBuscaServico('');
+    setPaginaServicos(1);
+    setFiltroCatalogo('TODOS');
+  };
 
   const carregar = useCallback(async () => {
     try {
@@ -100,16 +109,18 @@ export function OrdemServicoPage() {
   };
 
   const toggleServico = (id) => {
+    const s = servicos.find(sv => sv.id === id);
+    if (!s) return;
+
     setForm(prev => {
-      const jatem = prev.itensServicoIds.includes(id);
-      const novosIds = jatem
-        ? prev.itensServicoIds.filter(i => i !== id)
-        : [...prev.itensServicoIds, id];
+      const jatem = prev.itensServico.some(item => item.id === id);
+      const novosItens = jatem
+        ? prev.itensServico.filter(item => item.id !== id)
+        : [...prev.itensServico, { id: s.id, nomeServico: s.nomeServico, precoTabela: s.precoTabela, precoCobrado: Number(s.precoTabela || 0).toFixed(2) }];
       
       // Quando seleciona um serviço do catálogo, ele soma todos e joga no "valorServico"
-      const novoValorCat = novosIds.reduce((acc, sid) => {
-        const s = servicos.find(sv => sv.id === sid);
-        return acc + Number(s?.precoTabela || 0);
+      const novoValorCat = novosItens.reduce((acc, item) => {
+        return acc + Number(item.precoCobrado || 0);
       }, 0);
 
       // Recalcula o total com a nova soma do catálogo
@@ -119,9 +130,37 @@ export function OrdemServicoPage() {
 
       return { 
         ...prev, 
-        itensServicoIds: novosIds, 
+        itensServico: novosItens, 
         valorServico: novoValorCat.toFixed(2), // Preenche o input do serviço automaticamente
         valorTotal: totalRecalculado 
+      };
+    });
+  };
+
+  const handleEditarPrecoServico = (id, novoPreco) => {
+    setForm(prev => {
+      const novosItens = prev.itensServico.map(item => {
+        if (item.id === id) {
+          return { ...item, precoCobrado: novoPreco };
+        }
+        return item;
+      });
+
+      // Recalcula o valor total dos serviços
+      const novoValorCat = novosItens.reduce((acc, item) => {
+        return acc + Number(item.precoCobrado || 0);
+      }, 0);
+
+      // Recalcula o total com a nova soma do catálogo
+      const km = parseFloat(prev.quilometragem) || 0;
+      const precoKm = parseFloat(prev.valorKm) || 0;
+      const totalRecalculado = (novoValorCat + (km * precoKm)).toFixed(2);
+
+      return {
+        ...prev,
+        itensServico: novosItens,
+        valorServico: novoValorCat.toFixed(2),
+        valorTotal: totalRecalculado
       };
     });
   };
@@ -146,12 +185,14 @@ export function OrdemServicoPage() {
         quilometragem: form.quilometragem ? Number(form.quilometragem) : null,
         valorKm: form.valorKm ? Number(form.valorKm) : null, // Envia o valor do KM
         valorTotal: total,
-        itensServicoIds: form.itensServicoIds,
+        itensServico: form.itensServico.map(item => ({
+          itemServicoId: Number(item.id),
+          precoCobrado: Number(item.precoCobrado || 0)
+        })),
         mecanicos: form.mecanicos.map(m => ({ mecanico: { id: m.mecanicoId } })),
       };
       await api.post('/ordens', payload);
-      setModalAberto(false);
-      setForm(formInicial);
+      fecharModal();
       await carregar();
       success('Ordem de Serviço criada com sucesso!');
     } catch (err) {
@@ -209,6 +250,15 @@ export function OrdemServicoPage() {
       (o.veiculo && o.veiculo.toLowerCase().includes(busca.toLowerCase()));
     return matchStatus && matchBusca;
   });
+
+  const servicosFiltradosCatalogo = servicos.filter(s => {
+    const matchesSearch = s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase());
+    const matchesFilter = filtroCatalogo === 'TODOS' || form.itensServico.some(item => item.id === s.id);
+    return matchesSearch && matchesFilter;
+  });
+
+  const totalPaginasServicos = Math.max(1, Math.ceil(servicosFiltradosCatalogo.length / servicosPorPagina));
+  const servicosExibidos = servicosFiltradosCatalogo.slice((paginaServicos - 1) * servicosPorPagina, paginaServicos * servicosPorPagina);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -334,7 +384,7 @@ export function OrdemServicoPage() {
                 <h3 className="text-[30px] font-bold text-slate-900">Nova Ordem de Serviço</h3>
                 <p className="text-[14px] text-slate-400 mt-0.5">Preencha os dados do atendimento</p>
               </div>
-              <button onClick={() => { setModalAberto(false); setForm(formInicial); }} className="text-slate-300 hover:text-slate-500 transition">
+              <button onClick={fecharModal} className="text-slate-300 hover:text-slate-500 transition">
                 <X size={20} />
               </button>
             </div>
@@ -380,20 +430,50 @@ export function OrdemServicoPage() {
               </div>
 
               {/* Serviços do catálogo */}
-              <div>
-                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">
+              <div className="space-y-3">
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1">
                   Serviços do catálogo <span className="text-slate-400 font-normal">(opcional)</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Buscar serviço no catálogo..."
-                  value={buscaServico}
-                  onChange={e => { setBuscaServico(e.target.value); setPaginaServicos(1); }}
-                  className="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition mb-2"
-                />
-                <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1">
-                  {servicos.filter(s => s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase())).slice((paginaServicos - 1) * servicosPorPagina, paginaServicos * servicosPorPagina).map(s => {
-                    const selecionado = form.itensServicoIds.includes(s.id);
+                
+                {/* Filtro e Busca do catálogo */}
+                <div className="flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Buscar serviço no catálogo..."
+                      value={buscaServico}
+                      onChange={e => { setBuscaServico(e.target.value); setPaginaServicos(1); }}
+                      className="w-full border border-slate-200 pl-8 pr-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                    />
+                  </div>
+                  <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => { setFiltroCatalogo('TODOS'); setPaginaServicos(1); }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${filtroCatalogo === 'TODOS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setFiltroCatalogo('SELECIONADOS'); setPaginaServicos(1); }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${filtroCatalogo === 'SELECIONADOS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                      Selecionados ({form.itensServico.length})
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid de Serviços */}
+                <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1">
+                  {servicosExibidos.length === 0 && (
+                    <div className="col-span-2 py-6 text-center text-slate-400 text-sm">
+                      Nenhum serviço encontrado
+                    </div>
+                  )}
+                  {servicosExibidos.map(s => {
+                    const selecionado = form.itensServico.some(item => item.id === s.id);
                     return (
                       <button
                         key={s.id}
@@ -407,7 +487,75 @@ export function OrdemServicoPage() {
                     );
                   })}
                 </div>
+
+                {/* Controles de Paginação do Catálogo */}
+                {totalPaginasServicos > 1 && (
+                  <div className="flex items-center justify-between mt-2 px-1">
+                    <p className="text-xs text-slate-500 font-medium">
+                      Página {paginaServicos} de {totalPaginasServicos}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPaginaServicos(p => Math.max(p - 1, 1))}
+                        disabled={paginaServicos === 1}
+                        className="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaginaServicos(p => Math.min(p + 1, totalPaginasServicos))}
+                        disabled={paginaServicos >= totalPaginasServicos}
+                        className="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Serviços Selecionados com Preço Editável */}
+              {form.itensServico.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+                  <h4 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2 flex justify-between items-center">
+                    <span>Valores dos Serviços Selecionados</span>
+                    <span className="text-xs text-slate-500 font-normal">Altere os preços se necessário</span>
+                  </h4>
+                  <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                    {form.itensServico.map(item => (
+                      <div key={item.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-slate-800 truncate">{item.nomeServico}</p>
+                          <p className="text-xs text-slate-400">Preço tabela: R$ {Number(item.precoTabela || 0).toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-slate-500 font-medium">Cobrado:</span>
+                          <div className="relative w-32">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.precoCobrado}
+                              onChange={e => handleEditarPrecoServico(item.id, e.target.value)}
+                              className="w-full border border-slate-200 pl-8 pr-2 py-1.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleServico(item.id)}
+                            className="text-slate-300 hover:text-red-500 p-1.5 transition"
+                            title="Remover serviço"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* --- NOVA ÁREA FINANCEIRA --- */}
               <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
@@ -491,7 +639,7 @@ export function OrdemServicoPage() {
 
               {/* Botões */}
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setModalAberto(false); setForm(formInicial); }} className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 transition">
+                <button type="button" onClick={fecharModal} className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 transition">
                   Cancelar
                 </button>
                 <button type="submit" disabled={submitting} className="flex-1 px-4 py-3 bg-slate-900 text-white font-semibold rounded-lg hover:bg-slate-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
