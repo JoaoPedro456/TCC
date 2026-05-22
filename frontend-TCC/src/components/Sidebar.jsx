@@ -7,8 +7,14 @@ import {
   DollarSign,
   BarChart2,
   PieChart,
-  LogOut
+  LogOut,
+  Settings,
+  X,
+  Lock
 } from 'lucide-react';
+import { useState } from 'react';
+import api from '../services/api';
+import { useToast } from './ToastProvider';
 
 const ROUTE_MAP = {
   dashboard: '/dashboard',
@@ -29,6 +35,11 @@ export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const activeId = MENU_ID_BY_PATH[location.pathname] || 'dashboard';
+  const { success, error } = useToast();
+  
+  const [modalSenhaAberto, setModalSenhaAberto] = useState(false);
+  const [formSenha, setFormSenha] = useState({ senhaAtual: '', novaSenha: '' });
+  const [loadingSenha, setLoadingSenha] = useState(false);
 
   const menuPrincipal = [
     { id: 'dashboard', nome: 'Dashboard', icone: LayoutDashboard },
@@ -43,15 +54,26 @@ export function Sidebar() {
     { id: 'relatorios', nome: 'Relatórios Gerais', icone: BarChart2 },
   ];
 
-const handleLogout = () => {
-    // 1. Remove o token do navegador
+  const handleLogout = () => {
     localStorage.removeItem('token');
-    
-    // 2. Manda para a rota de login
     navigate('/login', { replace: true });
-    
-    // 3. O pulo do gato: Força um F5 automático para limpar a memória do React!
     window.location.reload();
+  };
+
+  const handleMudarSenha = async (e) => {
+    e.preventDefault();
+    setLoadingSenha(true);
+    try {
+      await api.put('/auth/alterar-senha', formSenha);
+      success('Senha alterada com sucesso!');
+      setModalSenhaAberto(false);
+      setFormSenha({ senhaAtual: '', novaSenha: '' });
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Erro ao alterar a senha. Verifique sua senha atual.';
+      error(msg);
+    } finally {
+      setLoadingSenha(false);
+    }
   };
 
   const handleNavigate = (routeKey) => {
@@ -111,6 +133,13 @@ const handleLogout = () => {
 
       <div className="p-4 border-t border-slate-100 space-y-1">
         <button
+          onClick={() => setModalSenhaAberto(true)}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all"
+        >
+          <Settings size={18} className="text-slate-400" />
+          Alterar Senha
+        </button>
+        <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600 transition-all"
         >
@@ -118,6 +147,49 @@ const handleLogout = () => {
           Sair
         </button>
       </div>
+
+      {modalSenhaAberto && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[9999] backdrop-blur-[2px]">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Lock size={16} className="text-slate-500" /> Alterar Senha
+              </h3>
+              <button onClick={() => setModalSenhaAberto(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleMudarSenha} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Senha Atual</label>
+                <input 
+                  type="password" 
+                  value={formSenha.senhaAtual} 
+                  onChange={e => setFormSenha({...formSenha, senhaAtual: e.target.value})} 
+                  className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Nova Senha (min. 6 caracteres)</label>
+                <input 
+                  type="password" 
+                  minLength={6}
+                  value={formSenha.novaSenha} 
+                  onChange={e => setFormSenha({...formSenha, novaSenha: e.target.value})} 
+                  className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" 
+                  required 
+                />
+              </div>
+              <button 
+                type="submit" 
+                disabled={loadingSenha} 
+                className="w-full bg-slate-900 text-white font-semibold py-3 rounded-lg hover:bg-slate-800 transition disabled:opacity-50 mt-2 flex justify-center items-center gap-2"
+              >
+                {loadingSenha ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : 'Confirmar Alteração'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

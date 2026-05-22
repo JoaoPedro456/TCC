@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+const apiUrl = import.meta.env.VITE_API_URL;
+if (!apiUrl) {
+  console.warn('[API] VITE_API_URL nao configurado! Verifique o arquivo .env');
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
+  baseURL: apiUrl,
   headers: {
     'Content-Type': 'application/json'
   }

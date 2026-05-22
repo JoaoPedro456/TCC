@@ -63,7 +63,7 @@ export function OrdemServicoPage() {
       setFuncionarios(resPessoas.data.filter(p => p.tipo === 'FUNCIONARIO'));
       setServicos(resServicos.data);
     } catch (err) {
-      console.error('Erro ao carregar dados', err);
+      // console.error('Erro ao carregar dados', err);
       error('Erro ao carregar dados');
     } finally {
       setLoading(false);
@@ -155,7 +155,7 @@ export function OrdemServicoPage() {
       await carregar();
       success('Ordem de Serviço criada com sucesso!');
     } catch (err) {
-      console.error('Erro ao salvar OS', err);
+      // console.error('Erro ao salvar OS', err);
       const msg = err.response?.data?.erro || 'Erro ao salvar a OS.';
       error(msg);
     } finally {

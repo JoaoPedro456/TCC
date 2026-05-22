@@ -69,7 +69,7 @@ export function PessoaPage() {
         }));
       }
     } catch (err) {
-      console.error("Erro ao buscar CEP", err);
+      // console.error("Erro ao buscar CEP", err);
     }
   };
 
@@ -120,7 +120,7 @@ export function PessoaPage() {
       const res = await api.get('/pessoa');
       setPessoas(res.data);
     } catch (err) {
-      console.error('Erro ao carregar pessoas:', err);
+      // console.error('Erro ao carregar pessoas:', err);
       error('Erro ao carregar dados do servidor.');
     }
   };
@@ -196,7 +196,7 @@ export function PessoaPage() {
       fecharModal();
       await carregar(); 
     } catch (err) {
-      console.error('Erro ao salvar:', err.response || err);
+      // console.error('Erro ao salvar:', err.response || err);
       // 2. Melhoria na captura de erro: mostra a mensagem exata do backend
       const msg = err.response?.data?.erro || err.response?.data?.message || 'Erro ao salvar. Verifique se o CPF/Telefone já existem.';
       error(msg);
@@ -212,7 +212,7 @@ export function PessoaPage() {
       await carregar();
       success('Registro removido!');
     } catch (err) {
-      console.error('Erro ao excluir:', err);
+      // console.error('Erro ao excluir:', err);
       error('Erro ao excluir do servidor.');
     }
   };

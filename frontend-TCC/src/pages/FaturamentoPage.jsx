@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowUpCircle, ArrowDownCircle, DollarSign, Plus, Clock, AlertCircle, Trash2, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, DollarSign, Plus, Clock, AlertCircle, Trash2, X, Search, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
 import api from '../services/api';
 import { useToast } from '../components/ToastProvider.jsx';
 
@@ -14,6 +14,8 @@ export function FaturamentoPage() {
   const [filtroStatus, setFiltroStatus] = useState('TODOS'); // TODOS, PENDENTE, PAGO, ATRASADO
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 10;
+  
+  const [selecionados, setSelecionados] = useState([]);
   // ---------------------------------------------
 
   const [modalAberto, setModalAberto] = useState(false);
@@ -33,7 +35,7 @@ export function FaturamentoPage() {
       setContasReceber(resReceber.data);
       setContasPagar(resPagar.data);
     } catch (err) {
-      console.error("Erro ao buscar dados", err);
+      // console.error("Erro ao buscar dados", err);
       error("Erro ao carregar os dados financeiros.");
     } finally {
       setLoading(false);
@@ -47,6 +49,7 @@ export function FaturamentoPage() {
   // Toda vez que mudarmos a aba, a busca ou o status, voltamos para a página 1
   useEffect(() => {
     setPaginaAtual(1);
+    setSelecionados([]); // Limpa a seleção ao mudar filtros
   }, [abaAtiva, busca, filtroStatus]);
 
   const handleSubmit = async (e) => {
@@ -87,6 +90,31 @@ export function FaturamentoPage() {
     }
   };
 
+  const darBaixaEmLote = async () => {
+    try {
+      setLoading(true);
+      await api.put('/financeiro/status-lote?status=PAGO', selecionados);
+      success(`${selecionados.length} contas marcadas como pagas com sucesso!`);
+      setSelecionados([]);
+      await carregarDados();
+    } catch (err) {
+      error('Erro ao dar baixa em lote.');
+      setLoading(false);
+    }
+  };
+
+  const toggleSelecao = (id) => {
+    setSelecionados(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+  };
+
+  const toggleSelecionarTodos = () => {
+    if (selecionados.length === contasPaginadas.length && contasPaginadas.length > 0) {
+      setSelecionados([]);
+    } else {
+      setSelecionados(contasPaginadas.map(c => c.id));
+    }
+  };
+
   // Cálculos de Caixa (Totais Globais)
   const totalReceberPendente = contasReceber.filter(c => c.status !== 'PAGO').reduce((acc, curr) => acc + curr.valor, 0);
   const totalPagarPendente = contasPagar.filter(c => c.status !== 'PAGO').reduce((acc, curr) => acc + curr.valor, 0);
@@ -123,6 +151,8 @@ export function FaturamentoPage() {
   
   // 4. Corta a lista para mostrar apenas os 10 itens da página atual
   const contasPaginadas = contasFiltradas.slice(indexPrimeiroItem, indexUltimoItem);
+
+  const totalSelecionado = contasPaginadas.filter(c => selecionados.includes(c.id)).reduce((acc, curr) => acc + curr.valor, 0);
 
   // ==========================================
 
@@ -213,6 +243,14 @@ export function FaturamentoPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
+                  <th className="p-4 w-12 text-center">
+                    <input 
+                      type="checkbox" 
+                      onChange={toggleSelecionarTodos} 
+                      checked={contasPaginadas.length > 0 && selecionados.length === contasPaginadas.length} 
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                    />
+                  </th>
                   <th className="p-4 font-bold">Descrição</th>
                   <th className="p-4 font-bold">Envolvido</th>
                   <th className="p-4 font-bold">Vencimento</th>
@@ -224,13 +262,21 @@ export function FaturamentoPage() {
               <tbody className="divide-y divide-slate-100">
                 {contasPaginadas.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="p-12 text-center text-slate-400">
+                    <td colSpan="7" className="p-12 text-center text-slate-400">
                       Nenhum lançamento encontrado para estes filtros.
                     </td>
                   </tr>
                 ) : (
                   contasPaginadas.map((conta) => (
-                    <tr key={conta.id} className="hover:bg-slate-50 transition-colors group">
+                    <tr key={conta.id} className={`hover:bg-slate-50 transition-colors group ${selecionados.includes(conta.id) ? 'bg-blue-50/50' : ''}`}>
+                      <td className="p-4 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={selecionados.includes(conta.id)} 
+                          onChange={() => toggleSelecao(conta.id)} 
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                        />
+                      </td>
                       <td className="p-4 text-slate-900 font-medium">{conta.descricao}</td>
                       <td className="p-4 text-slate-600 text-sm">{conta.envolvido}</td>
                       <td className="p-4 text-slate-600 text-sm">{formatarData(conta.vencimento)}</td>
@@ -312,6 +358,24 @@ export function FaturamentoPage() {
 
       </div>
 
+      {/* --- BARRA FLUTUANTE DE AÇÃO EM LOTE --- */}
+      {selecionados.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-40 animate-[slideIn_0.3s_ease-out_forwards]">
+          <div className="flex flex-col">
+            <span className="text-sm text-slate-300">{selecionados.length} conta(s) selecionada(s)</span>
+            <span className="text-lg font-black tracking-tight">{formatarMoeda(totalSelecionado)}</span>
+          </div>
+          <div className="w-px h-10 bg-slate-700"></div>
+          <button 
+            onClick={darBaixaEmLote} 
+            className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-sm"
+          >
+            <CheckCircle size={18} /> Dar Baixa
+          </button>
+        </div>
+      )}
+      {/* --------------------------------------- */}
+
       {/* Modal Novo Lançamento (Mantido Igual) */}
       {modalAberto && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-[2px]">
@@ -343,8 +407,8 @@ export function FaturamentoPage() {
                 <input placeholder="Ex: Conta de Luz, Venda de Peças..." value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" required />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Descrição</label>
-                <input placeholder="Descrição da movimentação" value={form.envolvido} onChange={e => setForm({...form, envolvido: e.target.value})} className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" required />
+                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Envolvido / Cliente</label>
+                <input placeholder="Nome do cliente ou fornecedor" value={form.envolvido} onChange={e => setForm({...form, envolvido: e.target.value})} className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

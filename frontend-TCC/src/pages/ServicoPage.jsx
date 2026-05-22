@@ -18,7 +18,7 @@ export function ServicoPage() {
       const res = await api.get('/servico');
       setServicos(res.data);
     } catch (err) {
-      console.error("Erro ao carregar servicos", err);
+      // console.error("Erro ao carregar servicos", err);
       error('Erro ao carregar catálogo');
     }
   };

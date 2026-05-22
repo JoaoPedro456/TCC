@@ -1,21 +1,70 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { BarChart2, Search, TrendingUp, DollarSign, ClipboardList, Users, Wrench } from 'lucide-react';
+import { Search, Calendar, DollarSign, ClipboardList, Users, Wrench, Download, ArrowUpRight, BarChart2, CheckCircle2, X } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
-// Importações do Recharts
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+
+// Componente para Formatação de Moeda Customizada no Tooltip
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900 text-white p-3 rounded-lg shadow-xl border border-slate-800">
+        <p className="text-sm font-semibold mb-1">{label || payload[0].name}</p>
+        <p className="text-emerald-400 font-bold">
+          R$ {Number(payload[0].value).toFixed(2).replace('.', ',')}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function RelatorioPage() {
+  // Helper dates
+  const getPrimeiroDiaMesAtual = () => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  };
+  const getHoje = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
   const [periodo, setPeriodo] = useState({
-    inicio: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    fim: new Date().toISOString().split('T')[0],
+    inicio: getPrimeiroDiaMesAtual(),
+    fim: getHoje(),
   });
+  
+  const [filtroRapido, setFiltroRapido] = useState('esteMes');
   const [relatorio, setRelatorio] = useState(null);
   const [faturamento, setFaturamento] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(false);
   const [aba, setAba] = useState('visao-geral');
   const { success, error } = useToast();
+
+  const aplicarFiltroRapido = (filtro) => {
+    setFiltroRapido(filtro);
+    const hoje = new Date();
+    let inicio, fim;
+    
+    fim = hoje.toISOString().split('T')[0];
+
+    if (filtro === 'esteMes') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+    } else if (filtro === 'mesPassado') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1).toISOString().split('T')[0];
+      fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0).toISOString().split('T')[0];
+    } else if (filtro === 'ultimos30') {
+      const trintaDias = new Date();
+      trintaDias.setDate(hoje.getDate() - 30);
+      inicio = trintaDias.toISOString().split('T')[0];
+    } else if (filtro === 'ultimos7') {
+      const seteDias = new Date();
+      seteDias.setDate(hoje.getDate() - 7);
+      inicio = seteDias.toISOString().split('T')[0];
+    }
+    setPeriodo({ inicio, fim });
+  };
 
   const buscar = async () => {
     setLoading(true);
@@ -30,117 +79,209 @@ export function RelatorioPage() {
       setDashboard(resDashboard.data);
       success('Relatório gerado com sucesso!');
     } catch (err) {
-      console.error('Erro ao buscar relatorio', err);
       error('Erro ao gerar relatório');
     } finally {
       setLoading(false);
     }
   };
 
-  // Preparando os dados para o Gráfico (só executa se 'faturamento' existir)
+  const handleDateChange = (type, value) => {
+    setPeriodo({ ...periodo, [type]: value });
+    setFiltroRapido('');
+  };
+
   const dadosOS = faturamento ? [
-    { name: 'Abertas', value: Number(faturamento.abertas || 0), color: '#F59E0B' },   // amber-500
-    { name: 'Concluídas', value: Number(faturamento.concluidas || 0), color: '#10B981' }, // emerald-500
-    { name: 'Canceladas', value: Number(faturamento.canceladas || 0), color: '#EF4444' }, // red-500
-  ] : [];
+    { name: 'Abertas', value: Number(faturamento.abertas || 0), color: '#3b82f6' },   // blue-500
+    { name: 'Concluídas', value: Number(faturamento.concluidas || 0), color: '#10b981' }, // emerald-500
+    { name: 'Canceladas', value: Number(faturamento.canceladas || 0), color: '#ef4444' }, // red-500
+  ].filter(d => d.value > 0) : []; // Esconde fatias zeradas
+
+  const dadosComissao = relatorio ? relatorio.map(r => ({
+    nome: r.nome.split(' ')[0], // Pega apenas primeiro nome para o grafico ficar limpo
+    comissao: Number(r.totalComissao || 0),
+    os: r.quantidadeOS
+  })).sort((a,b) => b.comissao - a.comissao) : [];
 
   return (
-    <div>
+    <div className="max-w-7xl mx-auto pb-10 bg-slate-50/30 min-h-screen">
+      
       {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Relatórios</h2>
-        <p className="text-slate-500 text-sm mt-1">Comissões, faturamento e análises detalhadas</p>
-      </div>
-
-      {/* Filtro de periodo */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm mb-5">
-        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2 text-sm">
-          <BarChart2 size={16} /> Selecionar Período
-        </h3>
-        <div className="flex gap-3 items-end flex-wrap">
-          <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1.5 uppercase tracking-wide">Data Início</label>
-            <input
-              type="date"
-              className="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-              value={periodo.inicio}
-              onChange={e => setPeriodo({ ...periodo, inicio: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1.5 uppercase tracking-wide">Data Fim</label>
-            <input
-              type="date"
-              className="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
-              value={periodo.fim}
-              onChange={e => setPeriodo({ ...periodo, fim: e.target.value })}
-            />
-          </div>
-          <button
-            onClick={buscar}
-            disabled={loading}
-            className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 transition disabled:opacity-50 text-sm"
-          >
-            {loading
-              ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-              : <Search size={16} />
-            }
-            Gerar Relatório
-          </button>
+      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Relatórios Gerais</h2>
+          <p className="text-slate-500 mt-1">Métricas de faturamento e performance da equipe</p>
         </div>
       </div>
 
-      {/* Cards rapidos do dashboard */}
-      {dashboard && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
-          <MiniCard icon={<DollarSign size={18} />} label="Faturamento Mês" value={`R$ ${Number(dashboard.faturamentoMes || 0).toFixed(2)}`} />
-          <MiniCard icon={<ClipboardList size={18} />} label="OS no Mês" value={dashboard.osMes} />
-          <MiniCard icon={<Users size={18} />} label="Clientes" value={dashboard.totalClientes} />
-          <MiniCard icon={<Wrench size={18} />} label="Funcionários" value={dashboard.totalFuncionarios} />
+      {/* Barra de Filtros Premium */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+          {/* Botões Rápidos */}
+          <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto w-full md:w-auto">
+            {[
+              { id: 'esteMes', label: 'Este Mês' },
+              { id: 'mesPassado', label: 'Mês Passado' },
+              { id: 'ultimos30', label: '30 Dias' },
+              { id: 'ultimos7', label: '7 Dias' }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => aplicarFiltroRapido(f.id)}
+                className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
+                  filtroRapido === f.id 
+                    ? 'bg-white text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
+
+          {/* Seletores Nativos */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:border-blue-500 transition-colors">
+              <Calendar size={14} className="text-slate-400 mr-2" />
+              <input 
+                type="date" 
+                className="bg-transparent text-sm text-slate-700 outline-none"
+                value={periodo.inicio}
+                onChange={e => handleDateChange('inicio', e.target.value)}
+              />
+            </div>
+            <span className="text-slate-400 text-sm">até</span>
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:border-blue-500 transition-colors">
+              <Calendar size={14} className="text-slate-400 mr-2" />
+              <input 
+                type="date" 
+                className="bg-transparent text-sm text-slate-700 outline-none"
+                value={periodo.fim}
+                onChange={e => handleDateChange('fim', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={buscar}
+          disabled={loading}
+          className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-50 whitespace-nowrap shadow-sm"
+        >
+          {loading ? (
+            <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+          ) : (
+            <Search size={16} />
+          )}
+          Processar Dados
+        </button>
+      </div>
+
+      {/* KPI Cards */}
+      {faturamento && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <KpiCard 
+            title="Faturamento do Período" 
+            value={`R$ ${Number(faturamento.totalFaturado || 0).toFixed(2).replace('.', ',')}`}
+            icon={<DollarSign size={20} />} 
+            color="emerald" 
+          />
+          <KpiCard 
+            title="OS Concluídas" 
+            value={faturamento.concluidas || 0}
+            icon={<CheckCircle2 size={20} />} 
+            color="blue" 
+          />
+          <KpiCard 
+            title="OS Abertas / Pendentes" 
+            value={faturamento.abertas || 0}
+            icon={<ClipboardList size={20} />} 
+            color="amber" 
+          />
+          <KpiCard 
+            title="OS Canceladas" 
+            value={faturamento.canceladas || 0}
+            icon={<X size={20} />} 
+            color="red" 
+          />
         </div>
       )}
 
       {/* Abas */}
       {relatorio && (
-        <div className="mb-5">
-          <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+        <div className="mb-6 border-b border-slate-200">
+          <div className="flex gap-6">
             {[
-              { key: 'visao-geral', label: 'Visão Geral' },
-              { key: 'tabela', label: 'Comissões' },
+              { key: 'visao-geral', label: 'Métricas e Gráficos' },
+              { key: 'tabela', label: 'Fechamento de Comissões' },
             ].map(a => (
               <button
                 key={a.key}
                 onClick={() => setAba(a.key)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
-                  aba === a.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                className={`pb-4 text-sm font-bold transition-colors relative ${
+                  aba === a.key 
+                    ? 'text-blue-600' 
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {a.label}
+                {aba === a.key && (
+                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-md"></div>
+                )}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* ABA: Visao Geral */}
+      {/* ABA: Visão Geral */}
       {aba === 'visao-geral' && faturamento && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-500">
           
-          {/* GRÁFICO OS POR STATUS (Atualizado com Recharts) */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col">
-            <h3 className="font-semibold text-slate-900 mb-4 text-sm">OS por Status</h3>
-            <div className="h-64 w-full flex-1">
-              {faturamento.quantidadeOS > 0 ? (
+          {/* Gráfico de Barras: Performance da Equipe */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+              <Users size={18} className="text-purple-500" /> Top Comissões (Performance)
+            </h3>
+            <div className="h-[300px] w-full">
+              {dadosComissao.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dadosComissao} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="nome" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: '#f8fafc'}} />
+                    <Bar dataKey="comissao" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-slate-400 text-sm bg-slate-50 rounded-xl">
+                  Sem dados de comissão no período.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Gráfico de Rosca: Status */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+              <ClipboardList size={18} className="text-blue-500" /> Distribuição de Serviços
+            </h3>
+            <div className="h-[300px] w-full flex flex-col">
+              {dadosOS.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={dadosOS}
                       cx="50%"
-                      cy="50%"
-                      innerRadius={65}
-                      outerRadius={85}
+                      cy="45%"
+                      innerRadius={80}
+                      outerRadius={110}
                       paddingAngle={5}
                       dataKey="value"
+                      stroke="none"
                     >
                       {dadosOS.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -148,94 +289,107 @@ export function RelatorioPage() {
                     </Pie>
                     <Tooltip 
                       formatter={(value) => [`${value} OS`, 'Quantidade']}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                     />
-                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                    <Legend verticalAlign="bottom" height={40} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: '14px', fontWeight: 500 }} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                  Nenhuma OS encontrada neste período
+                <div className="h-full flex items-center justify-center text-slate-400 text-sm bg-slate-50 rounded-xl">
+                  Nenhuma OS processada no período.
                 </div>
               )}
             </div>
           </div>
 
-          {/* Faturamento */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="font-semibold text-slate-900 mb-4 text-sm">{faturamento.periodo}</h3>
-            <div className="space-y-4">
-              <div className="bg-emerald-50 rounded-lg p-4">
-                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide">Faturamento Total</p>
-                <p className="text-2xl font-black text-emerald-600 mt-1">
-                  R$ {Number(faturamento.totalFaturado || 0).toFixed(2)}
-                </p>
-              </div>
-              <div className="grid grid-cols-4 gap-3">
-                <div className="bg-slate-50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-black text-slate-900">{faturamento.quantidadeOS || 0}</p>
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Total</p>
-                </div>
-                <div className="bg-amber-50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-black text-amber-600">{faturamento.abertas || 0}</p>
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Abertas</p>
-                </div>
-                <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-black text-emerald-600">{faturamento.concluidas || 0}</p>
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Concluídas</p>
-                </div>
-                <div className="bg-red-50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-black text-red-600">{faturamento.canceladas || 0}</p>
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Canceladas</p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* ABA: Tabela de comissoes */}
+      {/* ABA: Tabela Fechamento */}
       {aba === 'tabela' && relatorio && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase">Funcionário</th>
-                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase">Cargo</th>
-                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase">Comissão %</th>
-                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase">OS</th>
-                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase">Salário</th>
-                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase">Comissão</th>
-                <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {relatorio.map((r, i) => (
-                <tr key={i} className="hover:bg-slate-50/50">
-                  <td className="px-5 py-3.5 font-semibold text-slate-900">{r.nome}</td>
-                  <td className="px-5 py-3.5 text-sm text-slate-500">{r.cargo || '—'}</td>
-                  <td className="px-5 py-3.5 text-sm text-slate-500">{r.percentualComissao}%</td>
-                  <td className="px-5 py-3.5 text-sm text-slate-500">{r.quantidadeOS}</td>
-                  <td className="px-5 py-3.5 text-sm text-slate-500">R$ {Number(r.salarioBase || 0).toFixed(2)}</td>
-                  <td className="px-5 py-3.5 text-sm font-semibold text-blue-600">R$ {Number(r.totalComissao || 0).toFixed(2)}</td>
-                  <td className="px-5 py-3.5 text-sm font-black text-green-600">R$ {Number(r.totalReceber || 0).toFixed(2)}</td>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in duration-500">
+          <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+             <h3 className="font-bold text-slate-800 text-lg">Acerto Financeiro da Equipe</h3>
+             <button className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
+               <Download size={16} /> Exportar Relatório
+             </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50/80 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mecânico / Funcionário</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">OS Feitas</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Salário Base</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Total Comissões</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right bg-emerald-50/50">Valor Final a Pagar</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {relatorio.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-slate-400">Nenhum funcionário com produção neste período.</td>
+                  </tr>
+                ) : (
+                  relatorio.map((r, i) => (
+                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-slate-900">{r.nome}</p>
+                        <p className="text-xs text-slate-500 font-medium">{r.cargo || 'Mecânico'}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold">
+                          {r.quantidadeOS} serviços
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-500 font-medium text-right">
+                        R$ {Number(r.salarioBase || 0).toFixed(2).replace('.', ',')}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-blue-600 text-right">
+                        + R$ {Number(r.totalComissao || 0).toFixed(2).replace('.', ',')}
+                        <span className="block text-[10px] text-slate-400 font-medium mt-0.5">({r.percentualComissao}% de repasse)</span>
+                      </td>
+                      <td className="px-6 py-4 text-right bg-emerald-50/30">
+                        <span className="text-lg font-black text-emerald-600">
+                          R$ {Number(r.totalReceber || 0).toFixed(2).replace('.', ',')}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function MiniCard({ icon, label, value }) {
+// --- Subcomponente KPI ---
+function KpiCard({ title, value, icon, color, iconOverride }) {
+  const colors = {
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    blue: 'bg-blue-50 text-blue-600 border-blue-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    red: 'bg-red-50 text-red-600 border-red-100',
+  };
+  const ringColors = {
+    emerald: 'ring-emerald-500/20',
+    blue: 'ring-blue-500/20',
+    amber: 'ring-amber-500/20',
+    red: 'ring-red-500/20',
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-center gap-3">
-      <div className="p-2.5 bg-slate-50 rounded-lg text-slate-600">{icon}</div>
-      <div>
-        <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide">{label}</p>
-        <p className="text-lg font-black text-slate-900">{value}</p>
+    <div className={`bg-white rounded-2xl border ${colors[color].split(' ')[2]} p-6 shadow-sm relative overflow-hidden group hover:shadow-md transition-all`}>
+      <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full ${colors[color].split(' ')[0]} opacity-50 group-hover:scale-150 transition-transform duration-500`}></div>
+      <div className="relative z-10">
+        <div className={`w-10 h-10 rounded-xl ${colors[color].split(' ')[0]} ${colors[color].split(' ')[1]} flex items-center justify-center mb-4 ring-4 ${ringColors[color]}`}>
+          {iconOverride || icon}
+        </div>
+        <p className="text-sm font-semibold text-slate-500 mb-1">{title}</p>
+        <p className="text-3xl font-black text-slate-800 tracking-tight">{value}</p>
       </div>
     </div>
   );
