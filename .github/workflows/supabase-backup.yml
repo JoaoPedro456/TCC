@@ -2,28 +2,19 @@ name: Supabase Database Backup
 
 on:
   schedule:
-    # Executa todos os dias às 03:00 UTC (00:00 Horário de Brasília)
     - cron: '0 3 * * *'
-  workflow_dispatch: # Permite que você clique em um botão no GitHub para rodar manualmente o backup quando quiser
+  workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Instalar Cliente do PostgreSQL (Versão 17)
-        run: |
-          sudo apt-get update && sudo apt-get install -y curl ca-certificates gnupg
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
-          echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
-
       - name: Configurar Carimbo de Data/Hora (Timestamp)
         id: timestamp
         run: echo "TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
 
-      - name: Fazer o Backup do Supabase
+      - name: Fazer o Backup do Supabase (Usando Docker)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -32,14 +23,9 @@ jobs:
             exit 1
           fi
           
-          echo "Iniciando o backup do banco de dados..."
+          echo "Iniciando o backup do banco de dados com a imagem oficial do PostgreSQL 17..."
           
-          # O pg_dump exporta todo o banco.
-          # Usamos --clean para adicionar comandos de DROP TABLE antes de criar, facilitando a restauração
-          # Usamos --if-exists para evitar erros caso a tabela não exista ao fazer o DROP
-          # Usamos --no-owner e --no-privileges para evitar problemas de permissão ao restaurar
-          
-          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --clean --if-exists --no-owner --no-privileges > backup_tcc_${{ env.TIMESTAMP }}.sql
+          docker run --rm postgres:17 pg_dump "$SUPABASE_DB_URL" --clean --if-exists --no-owner --no-privileges > backup_tcc_${{ env.TIMESTAMP }}.sql
           
           echo "Backup concluído com sucesso."
 
@@ -48,4 +34,4 @@ jobs:
         with:
           name: database-backup-tcc-${{ env.TIMESTAMP }}
           path: backup_tcc_${{ env.TIMESTAMP }}.sql
-          retention-days: 90 # O arquivo será guardado gratuitamente por 90 dias
+          retention-days: 90
