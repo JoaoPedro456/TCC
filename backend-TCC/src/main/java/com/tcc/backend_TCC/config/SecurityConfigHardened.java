@@ -59,7 +59,7 @@ public class SecurityConfigHardened {
                 // Public endpoints
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/registrar").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
+                .requestMatchers("/api/health").permitAll()
 
                 // Admin endpoints - restricted
                 .requestMatchers(HttpMethod.POST, "/api/admin/**").hasRole("ADMIN")
