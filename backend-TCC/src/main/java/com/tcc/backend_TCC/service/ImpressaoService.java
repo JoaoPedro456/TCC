@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -56,18 +57,54 @@ public class ImpressaoService {
         document.open();
 
         // ════════════════════════════════════════════════════════
-        // CABEÇALHO
+        // CABEÇALHO COM LOGOTIPO
         // ════════════════════════════════════════════════════════
         PdfPTable headerTable = new PdfPTable(2);
         headerTable.setWidthPercentage(100);
-        headerTable.setWidths(new float[]{60, 40});
+        headerTable.setWidths(new float[]{65, 35});
 
         PdfPCell leftHeader = new PdfPCell();
         leftHeader.setBorder(Rectangle.BOTTOM);
         leftHeader.setBorderColor(CINZA_ESCURO);
         leftHeader.setPaddingBottom(10f);
-        leftHeader.addElement(new Paragraph("BAZANI MECÂNICA", F_TITULO));
-        leftHeader.addElement(new Paragraph("Sistema de Gestão de Ordens de Serviço", F_SUBTITULO));
+
+        // Tentar carregar logotipo do classpath
+        java.net.URL logoUrl = getClass().getResource("/static/logo-bazani.png");
+        com.lowagie.text.Image logoImg = null;
+        if (logoUrl != null) {
+            try {
+                logoImg = com.lowagie.text.Image.getInstance(logoUrl);
+                logoImg.scaleToFit(75f, 75f);
+            } catch (Exception e) {
+                System.err.println("Erro ao carregar logotipo para o PDF: " + e.getMessage());
+            }
+        }
+
+        if (logoImg != null) {
+            PdfPTable logoTextTable = new PdfPTable(2);
+            logoTextTable.setWidthPercentage(100);
+            logoTextTable.setWidths(new float[]{20, 80});
+
+            PdfPCell cLogo = new PdfPCell(logoImg);
+            cLogo.setBorder(Rectangle.NO_BORDER);
+            cLogo.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            cLogo.setPadding(0f);
+            logoTextTable.addCell(cLogo);
+
+            PdfPCell cText = new PdfPCell();
+            cText.setBorder(Rectangle.NO_BORDER);
+            cText.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            cText.setPadding(0f);
+            cText.setPaddingLeft(10f);
+            cText.addElement(new Paragraph("BAZANI MECÂNICA", F_TITULO));
+            cText.addElement(new Paragraph("Sistema de Gestão de Ordens de Serviço", F_SUBTITULO));
+            logoTextTable.addCell(cText);
+
+            leftHeader.addElement(logoTextTable);
+        } else {
+            leftHeader.addElement(new Paragraph("BAZANI MECÂNICA", F_TITULO));
+            leftHeader.addElement(new Paragraph("Sistema de Gestão de Ordens de Serviço", F_SUBTITULO));
+        }
 
         PdfPCell rightHeader = new PdfPCell();
         rightHeader.setBorder(Rectangle.BOTTOM);
@@ -82,19 +119,20 @@ public class ImpressaoService {
         status.setAlignment(Element.ALIGN_RIGHT);
         rightHeader.addElement(status);
 
-        Paragraph dataTxt = new Paragraph("Data: " + safe(os.getDataRegisto()), F_NORMAL);
+        String dataFormatada = os.getDataRegisto() != null ? os.getDataRegisto().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+        Paragraph dataTxt = new Paragraph("Data: " + dataFormatada, F_NORMAL);
         dataTxt.setAlignment(Element.ALIGN_RIGHT);
         rightHeader.addElement(dataTxt);
 
         headerTable.addCell(leftHeader);
         headerTable.addCell(rightHeader);
         document.add(headerTable);
-        document.add(spacer(20f));
+        document.add(spacer(15f));
 
         // ════════════════════════════════════════════════════════
         // DADOS DO CLIENTE
         // ════════════════════════════════════════════════════════
-        document.add(buildSectionHeader("DADOS DO CLIENTE"));
+        document.add(buildSectionHeader("Dados do Cliente"));
 
         PdfPTable tCliente = new PdfPTable(4);
         tCliente.setWidthPercentage(100);
@@ -106,20 +144,21 @@ public class ImpressaoService {
                 "Endereço:", safe(os.getCliente() != null ? os.getCliente().getLogradouro() : null));
 
         document.add(tCliente);
-        document.add(spacer(35f));
+        document.add(spacer(15f));
 
         // ════════════════════════════════════════════════════════
         // INFORMAÇÕES DO SERVIÇO E VEÍCULO
         // ════════════════════════════════════════════════════════
-        document.add(buildSectionHeader("INFORMAÇÕES DO SERVIÇO"));
+        document.add(buildSectionHeader("Informações do Serviço"));
 
         PdfPTable tDesc = new PdfPTable(1);
         tDesc.setWidthPercentage(100);
 
         PdfPCell descCell = new PdfPCell();
         descCell.setPadding(10f);
-        descCell.setBorderColor(PRETO);
-        descCell.setMinimumHeight(80f);
+        descCell.setBorderColor(CINZA_CLARO);
+        descCell.setBorderWidth(1f);
+        descCell.setMinimumHeight(60f);
 
         PdfPTable tInfoVeiculo = new PdfPTable(2);
         tInfoVeiculo.setWidthPercentage(100);
@@ -155,7 +194,7 @@ public class ImpressaoService {
 
         tDesc.addCell(descCell);
         document.add(tDesc);
-        document.add(spacer(35f));
+        document.add(spacer(15f));
 
         // ════════════════════════════════════════════════════════
         // MATEMÁTICA E DETALHAMENTO DE VALORES (SERVIÇOS + KM)
@@ -165,11 +204,16 @@ public class ImpressaoService {
         BigDecimal precoKm = os.getValorKm() != null ? os.getValorKm() : BigDecimal.ZERO;
         BigDecimal custoKm = qtdKm.multiply(precoKm).setScale(2, RoundingMode.HALF_UP);
 
+        BigDecimal valorServicos = totalGeral.subtract(custoKm);
+        if (valorServicos.compareTo(BigDecimal.ZERO) < 0) {
+            valorServicos = BigDecimal.ZERO;
+        }
+
         boolean temServicos = os.getItensServico() != null && !os.getItensServico().isEmpty();
         boolean temCustoKm = custoKm.compareTo(BigDecimal.ZERO) > 0;
 
         if (temServicos || temCustoKm) {
-            document.add(buildSectionHeader("DETALHAMENTO DE VALORES"));
+            document.add(buildSectionHeader("Detalhamento de Valores"));
 
             PdfPTable tSvc = new PdfPTable(2);
             tSvc.setWidthPercentage(100);
@@ -182,7 +226,7 @@ public class ImpressaoService {
             if (temServicos) {
                 for (var item : os.getItensServico()) {
                     tSvc.addCell(styledCell(safe(item.getItemServico() != null ? item.getItemServico().getNomeServico() : "Serviço"), Element.ALIGN_LEFT));
-                    tSvc.addCell(styledCell("R$ " + String.format("%.2f", item.getPrecoCobrado() != null ? item.getPrecoCobrado() : BigDecimal.ZERO).replace(".", ","), Element.ALIGN_CENTER));
+                    tSvc.addCell(styledCell("R$ " + String.format("%.2f", item.getPrecoCobrado() != null ? item.getPrecoCobrado() : BigDecimal.ZERO).replace(".", ","), Element.ALIGN_RIGHT));
                 }
             }
 
@@ -190,18 +234,18 @@ public class ImpressaoService {
             if (temCustoKm) {
                 String lblCustoKm = "Deslocação (" + String.format("%.1f", os.getQuilometragem()).replace(".", ",") + " km)";
                 tSvc.addCell(styledCell(lblCustoKm, Element.ALIGN_LEFT));
-                tSvc.addCell(styledCell("R$ " + String.format("%.2f", custoKm).replace(".", ","), Element.ALIGN_CENTER));
+                tSvc.addCell(styledCell("R$ " + String.format("%.2f", custoKm).replace(".", ","), Element.ALIGN_RIGHT));
             }
 
             document.add(tSvc);
-            document.add(spacer(20f));
+            document.add(spacer(15f));
         }
 
         // ════════════════════════════════════════════════════════
         // MECÂNICOS
         // ════════════════════════════════════════════════════════
         if (os.getMecanicos() != null && !os.getMecanicos().isEmpty()) {
-            document.add(buildSectionHeader("MECÂNICOS ENVOLVIDOS"));
+            document.add(buildSectionHeader("Mecânicos Envolvidos"));
 
             PdfPTable tMec = new PdfPTable(1);
             tMec.setWidthPercentage(100);
@@ -215,40 +259,54 @@ public class ImpressaoService {
                 tMec.addCell(mecCell);
             }
             document.add(tMec);
-            document.add(spacer(25f));
+            document.add(spacer(15f));
         }
 
         // ════════════════════════════════════════════════════════
-        // VALOR TOTAL E ASSINATURA (LIMPO)
+        // VALOR TOTAL E ASSINATURA (LIMPO E SEM CAIXAS ESCURAS)
         // ════════════════════════════════════════════════════════
         PdfPTable tBottom = new PdfPTable(2);
         tBottom.setWidthPercentage(100);
         tBottom.setWidths(new float[]{45, 55});
-        tBottom.setSpacingBefore(10f);
+        tBottom.setSpacingBefore(15f);
 
-        // Caixa de Total
-        PdfPCell totalCell = new PdfPCell();
-        totalCell.setBorder(Rectangle.BOX);
-        totalCell.setBorderWidth(1.5f);
-        totalCell.setBorderColor(PRETO);
-        totalCell.setBackgroundColor(CINZA_CLARO);
-        totalCell.setPadding(15f);
-        totalCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        // Subtabela de resumo financeiro (lado esquerdo) - Limpo parecido com comissão
+        PdfPCell summaryCell = new PdfPCell();
+        summaryCell.setBorder(Rectangle.NO_BORDER);
+        summaryCell.setPadding(0f);
 
-        Paragraph lblTotal = new Paragraph("TOTAL A PAGAR", F_LABEL);
-        lblTotal.setAlignment(Element.ALIGN_CENTER);
-        totalCell.addElement(lblTotal);
+        PdfPTable resumo = new PdfPTable(2);
+        resumo.setWidthPercentage(100);
+        resumo.setWidths(new float[]{60, 40});
 
-        String totalFmt = String.format("%.2f", totalGeral).replace(".", ",");
-        Paragraph valTotal = new Paragraph("R$ " + totalFmt, F_DESTAQUE_TOTAL);
-        valTotal.setAlignment(Element.ALIGN_CENTER);
-        valTotal.setSpacingBefore(5f);
-        totalCell.addElement(valTotal);
+        addResumoLinhaOS(resumo, "Total dos Serviços:", valorServicos);
+        if (temCustoKm) {
+            addResumoLinhaOS(resumo, "Deslocação (" + String.format("%.1f", os.getQuilometragem()).replace(".", ",") + " km):", custoKm);
+        }
 
-        // Caixa de Assinatura
+        PdfPCell lblTotal = new PdfPCell(new Paragraph("TOTAL A PAGAR:", new Font(Font.HELVETICA, 10, Font.BOLD, PRETO)));
+        lblTotal.setBorder(Rectangle.TOP);
+        lblTotal.setBorderColor(PRETO);
+        lblTotal.setBorderWidth(1.0f);
+        lblTotal.setPadding(6f);
+        lblTotal.setPaddingLeft(0f);
+        resumo.addCell(lblTotal);
+
+        PdfPCell valTotal = new PdfPCell(new Paragraph("R$ " + String.format("%.2f", totalGeral).replace(".", ","), new Font(Font.HELVETICA, 11, Font.BOLD, PRETO)));
+        valTotal.setBorder(Rectangle.TOP);
+        valTotal.setBorderColor(PRETO);
+        valTotal.setBorderWidth(1.0f);
+        valTotal.setPadding(6f);
+        valTotal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        resumo.addCell(valTotal);
+
+        summaryCell.addElement(resumo);
+
+        // Caixa de Assinatura (lado direito)
         PdfPCell sigCell = new PdfPCell();
         sigCell.setBorder(Rectangle.NO_BORDER);
         sigCell.setVerticalAlignment(Element.ALIGN_BOTTOM);
+        sigCell.setPadding(0f);
         sigCell.setPaddingTop(30f);
 
         Paragraph linhaAssinatura = new Paragraph("____________________________________________________", F_NORMAL);
@@ -260,34 +318,29 @@ public class ImpressaoService {
         lblAssinatura.setSpacingBefore(5f);
         sigCell.addElement(lblAssinatura);
 
-        tBottom.addCell(totalCell);
+        tBottom.addCell(summaryCell);
         tBottom.addCell(sigCell);
         document.add(tBottom);
-
 
         // ════════════════════════════════════════════════════════
         // RODAPÉ (Modificado para letra menor e transparente)
         // ════════════════════════════════════════════════════════
-
-        document.add(spacer(60f));
+        document.add(spacer(50f));
         Font fonteRodapePequena = new Font(F_SUBTITULO.getBaseFont(), 8f, F_SUBTITULO.getStyle(), F_SUBTITULO.getColor());
         Paragraph rodape = new Paragraph("Documento gerado pelo Sistema Bazani Mecânica e Autopeças", fonteRodapePequena);
         rodape.setAlignment(Element.ALIGN_CENTER);
         try {
             PdfGState estadoGraficoTransparente = new PdfGState();
-            estadoGraficoTransparente.setFillOpacity(0.5f); // 0.0f (totalmente transparente) a 1.0f (opaco). 0.5f é 50%.
+            estadoGraficoTransparente.setFillOpacity(0.5f);
 
-            // Obtemos o conteúdo direto do writer para aplicar o estado
             PdfContentByte cb = writer.getDirectContent();
             cb.saveState();
-            cb.setGState(estadoGraficoTransparente); // Aplica a transparência
+            cb.setGState(estadoGraficoTransparente);
 
             document.add(rodape);
-            cb.restoreState(); // Restaura o estado original (volta a ser opaco para os próximos elementos)
+            cb.restoreState();
 
         } catch (Exception e) {
-            // Caso não consiga aplicar a transparência (ex: sem acesso ao writer),
-            // adiciona o rodapé menor, mas opaco, como segurança.
             document.add(rodape);
             e.printStackTrace();
         }
@@ -299,21 +352,39 @@ public class ImpressaoService {
     private PdfPTable buildSectionHeader(String titulo) {
         PdfPTable t = new PdfPTable(1);
         t.setWidthPercentage(100);
-        PdfPCell cell = new PdfPCell(new Paragraph(titulo, F_SEC_HEADER));
-        cell.setBackgroundColor(PRETO);
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setPadding(6f);
+        PdfPCell cell = new PdfPCell(new Paragraph(titulo.toUpperCase(), new Font(Font.HELVETICA, 10, Font.BOLD, PRETO)));
+        cell.setBorder(Rectangle.BOTTOM);
+        cell.setBorderColor(PRETO);
+        cell.setBorderWidth(1.0f);
+        cell.setPadding(4f);
+        cell.setPaddingLeft(0f);
+        cell.setPaddingBottom(6f);
         t.addCell(cell);
         return t;
     }
 
     private PdfPCell buildTableHeader(String texto) {
         PdfPCell cell = new PdfPCell(new Paragraph(texto, F_LABEL));
-        cell.setBackgroundColor(CINZA_CLARO);
         cell.setBorder(Rectangle.BOTTOM);
         cell.setBorderColor(PRETO);
+        cell.setBorderWidth(1.0f);
         cell.setPadding(6f);
+        cell.setPaddingLeft(0f);
         return cell;
+    }
+
+    private void addResumoLinhaOS(PdfPTable table, String label, BigDecimal valor) {
+        PdfPCell c1 = new PdfPCell(new Paragraph(label, F_LABEL));
+        c1.setBorder(Rectangle.NO_BORDER);
+        c1.setPadding(6f);
+        c1.setPaddingLeft(0f);
+        table.addCell(c1);
+
+        PdfPCell c2 = new PdfPCell(new Paragraph("R$ " + String.format("%.2f", valor).replace(".", ","), F_NORMAL));
+        c2.setBorder(Rectangle.NO_BORDER);
+        c2.setPadding(6f);
+        c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        table.addCell(c2);
     }
 
     private void addInfoRow(PdfPTable table, String l1, String v1, String l2, String v2) {
@@ -369,14 +440,86 @@ public class ImpressaoService {
 
         Document document = new Document(PageSize.A4, 36, 36, 36, 36);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter.getInstance(document, baos);
+        PdfWriter writer = PdfWriter.getInstance(document, baos);
         document.open();
 
-        // Cabeçalho do Relatório
-        document.add(new Paragraph("RELATÓRIO DE COMISSÕES E PAGAMENTO", F_TITULO));
-        document.add(new Paragraph("Funcionário: " + func.getNome() + " (" + func.getCargo() + ")", F_NORMAL));
-        document.add(new Paragraph("Período: " + inicio.getMonthValue() + "/" + inicio.getYear(), F_SUBTITULO));
-        document.add(spacer(20f));
+        // ════════════════════════════════════════════════════════
+        // CABEÇALHO COM LOGOTIPO
+        // ════════════════════════════════════════════════════════
+        PdfPTable headerTable = new PdfPTable(2);
+        headerTable.setWidthPercentage(100);
+        headerTable.setWidths(new float[]{65, 35});
+
+        PdfPCell leftHeader = new PdfPCell();
+        leftHeader.setBorder(Rectangle.BOTTOM);
+        leftHeader.setBorderColor(CINZA_ESCURO);
+        leftHeader.setPaddingBottom(10f);
+
+        // Tentar carregar logotipo do classpath
+        java.net.URL logoUrl = getClass().getResource("/static/logo-bazani.png");
+        com.lowagie.text.Image logoImg = null;
+        if (logoUrl != null) {
+            try {
+                logoImg = com.lowagie.text.Image.getInstance(logoUrl);
+                logoImg.scaleToFit(75f, 75f);
+            } catch (Exception e) {
+                System.err.println("Erro ao carregar logotipo para o PDF: " + e.getMessage());
+            }
+        }
+
+        if (logoImg != null) {
+            PdfPTable logoTextTable = new PdfPTable(2);
+            logoTextTable.setWidthPercentage(100);
+            logoTextTable.setWidths(new float[]{20, 80});
+
+            PdfPCell cLogo = new PdfPCell(logoImg);
+            cLogo.setBorder(Rectangle.NO_BORDER);
+            cLogo.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            cLogo.setPadding(0f);
+            logoTextTable.addCell(cLogo);
+
+            PdfPCell cText = new PdfPCell();
+            cText.setBorder(Rectangle.NO_BORDER);
+            cText.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            cText.setPadding(0f);
+            cText.setPaddingLeft(10f);
+            cText.addElement(new Paragraph("BAZANI MECÂNICA", F_TITULO));
+            cText.addElement(new Paragraph("Sistema de Gestão de Ordens de Serviço", F_SUBTITULO));
+            logoTextTable.addCell(cText);
+
+            leftHeader.addElement(logoTextTable);
+        } else {
+            leftHeader.addElement(new Paragraph("BAZANI MECÂNICA", F_TITULO));
+            leftHeader.addElement(new Paragraph("Sistema de Gestão de Ordens de Serviço", F_SUBTITULO));
+        }
+
+        PdfPCell rightHeader = new PdfPCell();
+        rightHeader.setBorder(Rectangle.BOTTOM);
+        rightHeader.setBorderColor(CINZA_ESCURO);
+        rightHeader.setPaddingBottom(10f);
+
+        Paragraph relTitulo = new Paragraph("RELATÓRIO DE COMISSÕES", F_TITULO);
+        relTitulo.setAlignment(Element.ALIGN_RIGHT);
+        rightHeader.addElement(relTitulo);
+
+        Paragraph funcNome = new Paragraph("Funcionário: " + func.getNome() + " (" + safe(func.getCargo()) + ")", F_LABEL);
+        funcNome.setAlignment(Element.ALIGN_RIGHT);
+        rightHeader.addElement(funcNome);
+
+        String periodoText = String.format("%02d/%d", inicio.getMonthValue(), inicio.getYear());
+        Paragraph periodoTxt = new Paragraph("Período: " + periodoText, F_NORMAL);
+        periodoTxt.setAlignment(Element.ALIGN_RIGHT);
+        rightHeader.addElement(periodoTxt);
+
+        headerTable.addCell(leftHeader);
+        headerTable.addCell(rightHeader);
+        document.add(headerTable);
+        document.add(spacer(15f));
+
+        // ════════════════════════════════════════════════════════
+        // DADOS DAS COMISSÕES
+        // ════════════════════════════════════════════════════════
+        document.add(buildSectionHeader("Comissões do Período"));
 
         // Tabela de OSs realizadas
         PdfPTable table = new PdfPTable(4);
@@ -390,10 +533,11 @@ public class ImpressaoService {
 
         BigDecimal totalComissao = BigDecimal.ZERO;
         for (OrdemServicoMecanico p : participacoes) {
-            // Agora o valorAtribuido já vem do banco calculado apenas sobre o serviço!
             BigDecimal valorComissaoOs = p.getValorAtribuido() != null ? p.getValorAtribuido() : BigDecimal.ZERO;
 
-            table.addCell(styledCell(p.getOrdemServico().getDataRegisto().toString(), Element.ALIGN_LEFT));
+            String dataOS = p.getOrdemServico().getDataRegisto() != null ? p.getOrdemServico().getDataRegisto().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+
+            table.addCell(styledCell(dataOS, Element.ALIGN_LEFT));
             table.addCell(styledCell(p.getOrdemServico().getId().toString(), Element.ALIGN_CENTER));
             table.addCell(styledCell(p.getOrdemServico().getCliente().getNome(), Element.ALIGN_LEFT));
             table.addCell(styledCell("R$ " + String.format("%.2f", valorComissaoOs).replace(".", ","), Element.ALIGN_RIGHT));
@@ -401,33 +545,93 @@ public class ImpressaoService {
             totalComissao = totalComissao.add(valorComissaoOs);
         }
         document.add(table);
-        document.add(spacer(30f));
+        document.add(spacer(15f));
 
-        // Fechamento Financeiro (A "Mágica" do Salário + Comissão)
+        // ════════════════════════════════════════════════════════
+        // FECHAMENTO FINANCEIRO E ASSINATURA (LIMPO)
+        // ════════════════════════════════════════════════════════
+        PdfPTable tBottom = new PdfPTable(2);
+        tBottom.setWidthPercentage(100);
+        tBottom.setWidths(new float[]{45, 55});
+        tBottom.setSpacingBefore(15f);
+
+        // Subtabela de resumo financeiro (lado esquerdo) - idêntico ao estilo da OS
+        PdfPCell summaryCell = new PdfPCell();
+        summaryCell.setBorder(Rectangle.NO_BORDER);
+        summaryCell.setPadding(0f);
+
         PdfPTable resumo = new PdfPTable(2);
-        resumo.setWidthPercentage(50);
-        resumo.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        resumo.setWidthPercentage(100);
+        resumo.setWidths(new float[]{60, 40});
 
         BigDecimal salarioBase = BigDecimal.valueOf(func.getSalarioBase() != null ? func.getSalarioBase() : 0);
-        BigDecimal totalGeral = salarioBase.add(totalComissao);
+        BigDecimal totalReceber = salarioBase.add(totalComissao);
 
-        addResumoLinha(resumo, "Salário Base:", salarioBase);
-        addResumoLinha(resumo, "Total Comissões:", totalComissao);
-        addResumoLinha(resumo, "TOTAL A RECEBER:", totalGeral);
+        addResumoLinhaOS(resumo, "Salário Base:", salarioBase);
+        addResumoLinhaOS(resumo, "Total Comissões:", totalComissao);
 
-        document.add(resumo);
+        PdfPCell lblTotal = new PdfPCell(new Paragraph("TOTAL A RECEBER:", new Font(Font.HELVETICA, 10, Font.BOLD, PRETO)));
+        lblTotal.setBorder(Rectangle.TOP);
+        lblTotal.setBorderColor(PRETO);
+        lblTotal.setBorderWidth(1.0f);
+        lblTotal.setPadding(6f);
+        lblTotal.setPaddingLeft(0f);
+        resumo.addCell(lblTotal);
+
+        PdfPCell valTotal = new PdfPCell(new Paragraph("R$ " + String.format("%.2f", totalReceber).replace(".", ","), new Font(Font.HELVETICA, 11, Font.BOLD, PRETO)));
+        valTotal.setBorder(Rectangle.TOP);
+        valTotal.setBorderColor(PRETO);
+        valTotal.setBorderWidth(1.0f);
+        valTotal.setPadding(6f);
+        valTotal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        resumo.addCell(valTotal);
+
+        summaryCell.addElement(resumo);
+
+        // Caixa de Assinatura (lado direito)
+        PdfPCell sigCell = new PdfPCell();
+        sigCell.setBorder(Rectangle.NO_BORDER);
+        sigCell.setVerticalAlignment(Element.ALIGN_BOTTOM);
+        sigCell.setPadding(0f);
+        sigCell.setPaddingTop(30f);
+
+        Paragraph linhaAssinatura = new Paragraph("____________________________________________________", F_NORMAL);
+        linhaAssinatura.setAlignment(Element.ALIGN_CENTER);
+        sigCell.addElement(linhaAssinatura);
+
+        Paragraph lblAssinatura = new Paragraph("Assinatura do Funcionário", F_LABEL);
+        lblAssinatura.setAlignment(Element.ALIGN_CENTER);
+        lblAssinatura.setSpacingBefore(5f);
+        sigCell.addElement(lblAssinatura);
+
+        tBottom.addCell(summaryCell);
+        tBottom.addCell(sigCell);
+        document.add(tBottom);
+
+        // ════════════════════════════════════════════════════════
+        // RODAPÉ (Modificado para letra menor e transparente)
+        // ════════════════════════════════════════════════════════
+        document.add(spacer(50f));
+        Font fonteRodapePequena = new Font(F_SUBTITULO.getBaseFont(), 8f, F_SUBTITULO.getStyle(), F_SUBTITULO.getColor());
+        Paragraph rodape = new Paragraph("Documento gerado pelo Sistema Bazani Mecânica e Autopeças", fonteRodapePequena);
+        rodape.setAlignment(Element.ALIGN_CENTER);
+        try {
+            PdfGState estadoGraficoTransparente = new PdfGState();
+            estadoGraficoTransparente.setFillOpacity(0.5f);
+
+            PdfContentByte cb = writer.getDirectContent();
+            cb.saveState();
+            cb.setGState(estadoGraficoTransparente);
+
+            document.add(rodape);
+            cb.restoreState();
+
+        } catch (Exception e) {
+            document.add(rodape);
+            e.printStackTrace();
+        }
+
         document.close();
         return baos.toByteArray();
-    }
-
-    private void addResumoLinha(PdfPTable table, String label, BigDecimal valor) {
-        PdfPCell c1 = new PdfPCell(new Paragraph(label, F_LABEL));
-        c1.setBorder(Rectangle.NO_BORDER);
-        table.addCell(c1);
-
-        PdfPCell c2 = new PdfPCell(new Paragraph("R$ " + String.format("%.2f", valor), F_NORMAL));
-        c2.setBorder(Rectangle.NO_BORDER);
-        c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        table.addCell(c2);
     }
 }
