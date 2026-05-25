@@ -164,7 +164,7 @@ export function DashboardPage() {
       <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
-            Bom dia, {nomeUsuario}!
+            Olá, {nomeUsuario}!
           </h2>
           <p className="text-slate-500 mt-1">
             Resumo de atividades em <span className="text-blue-600 font-medium">{mesFormatado}</span>
