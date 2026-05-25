@@ -92,6 +92,9 @@ public class RelatorioService {
         LocalDate hoje = LocalDate.now();
         LocalDate mesAtual = hoje.withDayOfMonth(1);
 
+        // NOTA: Como a entidade OrdemServico não possui uma coluna 'dataConclusao',
+        // o faturamento é calculado com base no regime de competência utilizando a 'dataRegisto'
+        // das ordens de serviço que se encontram no status 'CONCLUIDA'.
         List<OrdemServico> lista = ordemServicoRepository.findByDataRegistoBetween(mesAtual, hoje);
 
         BigDecimal faturamentoMes = lista.stream()

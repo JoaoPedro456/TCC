@@ -59,6 +59,24 @@ public class OrdemServicoService {
         BigDecimal valorKm = dto.getValorKm() != null ? dto.getValorKm() : BigDecimal.ZERO;
         BigDecimal valorTotal = dto.getValorTotal() != null ? dto.getValorTotal() : BigDecimal.ZERO;
 
+        // --- Validação de consistência do valor total se houver itens no catálogo ---
+        if (dto.getItensServico() != null && !dto.getItensServico().isEmpty()) {
+            BigDecimal totalCalculado = BigDecimal.ZERO;
+            for (var itemDto : dto.getItensServico()) {
+                BigDecimal preco = itemDto.getPrecoCobrado() != null ? itemDto.getPrecoCobrado() : BigDecimal.ZERO;
+                totalCalculado = totalCalculado.add(preco);
+            }
+            BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
+            BigDecimal custoKm = qtdKm.multiply(valorKm);
+            totalCalculado = totalCalculado.add(custoKm);
+
+            BigDecimal diferenca = valorTotal.subtract(totalCalculado).abs();
+            if (diferenca.compareTo(new BigDecimal("0.02")) > 0) {
+                throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                        "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços e deslocamento (R$ " + totalCalculado + ").");
+            }
+        }
+
         os.setValorKm(valorKm);
         os.setValorTotal(valorTotal);
         os.setStatus(StatusOS.ABERTA);
@@ -126,28 +144,54 @@ public class OrdemServicoService {
     @Transactional
     public OrdemServico atualizarStatus(Long id, String status) {
         OrdemServico os = buscarPorId(id);
-        StatusOS novoStatus = StatusOS.valueOf(status);
+        StatusOS novoStatus;
+        try {
+            novoStatus = StatusOS.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                    "Status inválido: " + status + ". Valores aceitos: ABERTA, CONCLUIDA, CANCELADA");
+        }
 
-        // Se o status da OS está mudando para CONCLUÍDA e ela ainda não era CONCLUÍDA
-        if (novoStatus == StatusOS.CONCLUIDA && os.getStatus() != StatusOS.CONCLUIDA) {
+        // Se o status da OS está mudando para CONCLUÍDA
+        if (novoStatus == StatusOS.CONCLUIDA) {
+            // Busca se já existe um lançamento para esta OS
+            Lancamento contaReceber = lancamentoRepository.findByOrdemServicoId(os.getId())
+                    .orElse(new Lancamento());
 
-            Lancamento contaReceber = new Lancamento();
             contaReceber.setDescricao("OS #" + os.getId() + " - " + (os.getVeiculo() != null ? os.getVeiculo() : "Serviços"));
             contaReceber.setEnvolvido(os.getCliente() != null ? os.getCliente().getNome() : "Cliente não informado");
             contaReceber.setValor(os.getValorTotal());
-            contaReceber.setVencimento(LocalDate.now()); // Coloca o vencimento para o dia de hoje
-            contaReceber.setTipo(TipoLancamento.RECEBER);
-            contaReceber.setStatus(StatusLancamento.PENDENTE);
+            if (contaReceber.getId() == null) {
+                contaReceber.setVencimento(LocalDate.now()); // Apenas define vencimento hoje se for novo
+                contaReceber.setTipo(TipoLancamento.RECEBER);
+                contaReceber.setStatus(StatusLancamento.PENDENTE);
+                contaReceber.setOrdemServicoId(os.getId());
+            }
 
-            // Salva a conta na tabela de faturamento!
+            // Salva ou atualiza a conta na tabela de faturamento!
             lancamentoRepository.save(contaReceber);
+        } else {
+            // Se o novo status NÃO é CONCLUÍDA (ex: reabriu ou cancelou), remove o lançamento se ainda estiver pendente
+            lancamentoRepository.findByOrdemServicoId(os.getId()).ifPresent(lancamento -> {
+                if (lancamento.getStatus() == StatusLancamento.PENDENTE) {
+                    lancamentoRepository.delete(lancamento);
+                }
+            });
         }
 
         os.setStatus(novoStatus);
         return repository.save(os);
     }
 
+    @Transactional
     public void excluir(Long id) {
+        if (!repository.existsById(id)) {
+            throw new RecursoNaoEncontradoException("OS não encontrada com ID: " + id);
+        }
+        // Remove lançamentos vinculados se existirem
+        lancamentoRepository.findByOrdemServicoId(id).ifPresent(lancamento -> {
+            lancamentoRepository.delete(lancamento);
+        });
         repository.deleteById(id);
     }
 

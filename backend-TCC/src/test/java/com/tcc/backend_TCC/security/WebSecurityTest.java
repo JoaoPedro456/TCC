@@ -53,6 +53,16 @@ public class WebSecurityTest {
     }
 
     @Test
+    void testGetPessoasAuthenticated() throws Exception {
+        String token = jwtService.gerarToken("Andressa", "ADMIN");
+        System.out.println("TOKEN_DIAGNOSTICO: " + token);
+        mockMvc.perform(get("/api/pessoa")
+                .header("Authorization", "Bearer " + token))
+                .andDo(print())
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("2. Public endpoints should be accessible without authentication")
     void testPublicEndpointsAccessible() throws Exception {
         mockMvc.perform(post("/api/auth/login")
@@ -66,11 +76,31 @@ public class WebSecurityTest {
     }
 
     private String generateUniqueCpf() {
-        return String.format("9%02d.%03d.%03d-%02d", 
-            (int)(Math.random() * 100), 
-            (int)(Math.random() * 1000), 
-            (int)(Math.random() * 1000), 
-            (int)(Math.random() * 100));
+        int[] cpfArray = new int[9];
+        for (int i = 0; i < 9; i++) {
+            cpfArray[i] = (int) (Math.random() * 10);
+        }
+        
+        int soma = 0;
+        for (int i = 0; i < 9; i++) {
+            soma += cpfArray[i] * (10 - i);
+        }
+        int r1 = 11 - (soma % 11);
+        int d1 = (r1 == 10 || r1 == 11) ? 0 : r1;
+        
+        soma = 0;
+        for (int i = 0; i < 9; i++) {
+            soma += cpfArray[i] * (11 - i);
+        }
+        soma += d1 * 2;
+        int r2 = 11 - (soma % 11);
+        int d2 = (r2 == 10 || r2 == 11) ? 0 : r2;
+        
+        return String.format("%d%d%d.%d%d%d.%d%d%d-%d%d",
+            cpfArray[0], cpfArray[1], cpfArray[2],
+            cpfArray[3], cpfArray[4], cpfArray[5],
+            cpfArray[6], cpfArray[7], cpfArray[8],
+            d1, d2);
     }
 
     private String generateUniqueTel() {

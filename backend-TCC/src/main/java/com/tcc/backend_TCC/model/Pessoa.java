@@ -10,7 +10,6 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Data
 @SQLDelete(sql = "UPDATE pessoa SET ativo = false WHERE id=?")
-@SQLRestriction("ativo = true")
 public class Pessoa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,19 +23,19 @@ public class Pessoa {
     private String nome;
 
     // Adicionado: unique = true proíbe telefones repetidos no banco
-    @Column(unique = true)
+    @Column
     @Size(max = 20, message = "Telefone deve ter no máximo 20 caracteres")
     @Pattern(regexp = "^[0-9\\-\\+\\(\\) ]*$", message = "Telefone contém caracteres inválidos")
     private String telefone;
 
     // CPF para pessoa física
-    @Column(unique = true)
+    @Column
     @Size(max = 14, message = "CPF deve ter no máximo 14 caracteres")
     @Pattern(regexp = "^[0-9\\-\\.]*$", message = "CPF deve conter apenas números, traços e pontos")
     private String cpf;
 
     // CNPJ para pessoa jurídica
-    @Column(unique = true)
+    @Column
     @Size(max = 18, message = "CNPJ deve ter no máximo 18 caracteres")
     @Pattern(regexp = "^[0-9\\-\\./]*$", message = "CNPJ deve conter apenas números, traços, pontos e barra")
     private String cnpj;

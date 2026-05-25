@@ -46,12 +46,26 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Login e senha sao obrigatorios"));
         }
 
+        // --- Rate Limiting para Login (Anti-Brute-Force) ---
+        if (!rateLimitingService.isLoginAllowed(clientIp, login)) {
+            long retryAfter = rateLimitingService.getLoginRetryAfterSeconds(clientIp, login);
+            log.warn("LOGIN BLOQUEADO! IP: {}, Login: {}", clientIp, login);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header("Retry-After", String.valueOf(retryAfter))
+                    .body(Map.of(
+                            "error", "Muitas tentativas de login",
+                            "message", "Tente novamente em " + (retryAfter / 60) + " minutos."
+                    ));
+        }
+
         try {
             String token = authService.login(login, senha);
             rateLimitingService.resetLoginAttempts(clientIp, login);
             log.info("Login bem-sucedido para: {}", login);
             return ResponseEntity.ok(Map.of("token", token));
         } catch (Exception e) {
+            // Registra a tentativa malsucedida para computar nos buckets/testes
+            rateLimitingService.registerFailedAttempt(clientIp, login);
             log.warn("Login falhou para: {} - {}", login, e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", "Login ou senha incorretos"));
         }

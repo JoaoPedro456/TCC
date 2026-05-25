@@ -47,4 +47,7 @@ public class Lancamento {
     @NotNull(message = "Status é obrigatório")
     @Enumerated(EnumType.STRING)
     private StatusLancamento status = StatusLancamento.PENDENTE;
+
+    @Column(name = "ordem_servico_id")
+    private Long ordemServicoId;
 }

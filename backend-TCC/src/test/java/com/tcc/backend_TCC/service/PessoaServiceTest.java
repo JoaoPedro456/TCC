@@ -43,16 +43,19 @@ class PessoaServiceTest {
     void salvar_cpfDuplicado_lancaExcecao() {
         Pessoa pessoa = new Pessoa();
         pessoa.setNome("João");
-        pessoa.setCpf("12345678900");
+        pessoa.setCpf("08530588908"); // CPF válido
         pessoa.setTipo(TipoPessoa.CLIENTE);
 
         Pessoa existente = new Pessoa();
         existente.setId(1L);
-        existente.setCpf("12345678900");
+        existente.setCpf("08530588908");
+        existente.setAtivo(true);
 
-        when(repository.findByCpfIncludingDeleted("12345678900")).thenReturn(Optional.of(existente));
+        when(repository.findByCpfIncludingDeleted("08530588908")).thenReturn(Optional.of(existente));
+        when(repository.findByCpfAndAtivoTrue("08530588908")).thenReturn(Optional.of(existente));
 
-        assertThrows(ResponseStatusException.class, () -> service.salvar(pessoa));
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.salvar(pessoa));
+        assertEquals("Este CPF já está cadastrado no sistema!", ex.getReason());
     }
 
     @Test

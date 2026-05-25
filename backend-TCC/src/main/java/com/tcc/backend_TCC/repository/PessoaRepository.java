@@ -14,6 +14,12 @@ public interface PessoaRepository extends JpaRepository<Pessoa, Long> {
 
     long countByTipo(TipoPessoa tipo);
 
+    List<Pessoa> findByAtivoTrue();
+
+    List<Pessoa> findByTipoAndAtivoTrue(TipoPessoa tipo);
+
+    long countByTipoAndAtivoTrue(TipoPessoa tipo);
+
     @Query(value = "SELECT * FROM pessoa WHERE cpf = :cpf", nativeQuery = true)
     Optional<Pessoa> findByCpfIncludingDeleted(@Param("cpf") String cpf);
 
@@ -22,4 +28,8 @@ public interface PessoaRepository extends JpaRepository<Pessoa, Long> {
 
     @Query(value = "SELECT * FROM pessoa WHERE telefone = :telefone", nativeQuery = true)
     Optional<Pessoa> findByTelefoneIncludingDeleted(@Param("telefone") String telefone);
+
+    Optional<Pessoa> findByCpfAndAtivoTrue(String cpf);
+    Optional<Pessoa> findByCnpjAndAtivoTrue(String cnpj);
+    Optional<Pessoa> findByTelefoneAndAtivoTrue(String telefone);
 }

@@ -22,7 +22,7 @@ public class Usuario {
 
     @NotBlank(message = "Login é obrigatório")
     @Size(min = 3, max = 50, message = "Login deve ter entre 3 e 50 caracteres")
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private String login;
 
     @NotBlank(message = "Senha é obrigatória")

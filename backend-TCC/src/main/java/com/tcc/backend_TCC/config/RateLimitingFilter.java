@@ -43,13 +43,7 @@ public class RateLimitingFilter implements Filter {
         }
 
         try {
-            boolean isLoginEndpoint = isLoginRequest(requestUri, method);
-
-            if (isLoginEndpoint) {
-                handleLoginRateLimit(httpRequest, httpResponse, chain, clientIp);
-            } else {
-                handleGeneralRateLimit(httpRequest, httpResponse, chain, clientIp);
-            }
+            handleGeneralRateLimit(httpRequest, httpResponse, chain, clientIp);
         } catch (Exception e) {
             // Fail-closed: em caso de erro no filtro, BLOQUEIA a requisicao por seguranca
             log.error("Erro no filtro de rate limiting. Bloqueando requisicao por seguranca.", e);
@@ -59,34 +53,6 @@ public class RateLimitingFilter implements Filter {
                     "{\"error\": \"Servico temporariamente indisponivel. Tente novamente em instantes.\"}"
             );
         }
-    }
-
-    private boolean isLoginRequest(String uri, String method) {
-        return method.equalsIgnoreCase("POST") &&
-                (uri.contains("/auth/login") || uri.contains("/login"));
-    }
-
-    private void handleLoginRateLimit(HttpServletRequest request, HttpServletResponse response,
-                                      FilterChain chain, String clientIp)
-            throws IOException, ServletException {
-
-        String username = extractUsernameFromRequest(request);
-
-        if (!rateLimitingService.isLoginAllowed(clientIp, username)) {
-            long retryAfter = rateLimitingService.getLoginRetryAfterSeconds(clientIp, username);
-            log.warn("LOGIN BLOQUEADO! IP: {}", clientIp);
-
-            response.setStatus(429);
-            response.setContentType("application/json");
-            response.setHeader("Retry-After", String.valueOf(retryAfter));
-            response.getWriter().write(
-                    "{\"error\": \"Muitas tentativas de login\", " +
-                            "\"message\": \"Tente novamente em " + (retryAfter / 60) + " minutos.\"}"
-            );
-            return;
-        }
-
-        chain.doFilter(request, response);
     }
 
     private void handleGeneralRateLimit(HttpServletRequest request, HttpServletResponse response,
@@ -105,11 +71,6 @@ public class RateLimitingFilter implements Filter {
         }
 
         chain.doFilter(request, response);
-    }
-
-    private String extractUsernameFromRequest(HttpServletRequest request) {
-        String username = request.getHeader("X-Login-Username");
-        return username;
     }
 
     private String getClientIp(HttpServletRequest request) {

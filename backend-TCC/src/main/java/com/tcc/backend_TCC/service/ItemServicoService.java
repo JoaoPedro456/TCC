@@ -16,7 +16,7 @@ public class ItemServicoService {
     private ItemServicoRepository repository;
 
     public List<ItemServico> listarTodos() {
-        return repository.findAll();
+        return repository.findByAtivoTrue();
     }
 
     public ItemServico salvar(ItemServico s) {

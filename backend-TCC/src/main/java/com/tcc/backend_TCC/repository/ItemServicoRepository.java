@@ -11,4 +11,6 @@ public interface ItemServicoRepository extends JpaRepository<ItemServico, Long> 
 
     // Bônus: Caso você queira buscar um serviço pelo nome exato no futuro
     List<ItemServico> findByNomeServicoContainingIgnoreCase(String nome);
+
+    List<ItemServico> findByAtivoTrue();
 }

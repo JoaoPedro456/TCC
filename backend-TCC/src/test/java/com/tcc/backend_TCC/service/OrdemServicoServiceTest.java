@@ -158,6 +158,7 @@ class OrdemServicoServiceTest {
 
     @Test
     void excluir_comSucesso_removeOS() {
+        when(osRepository.existsById(1L)).thenReturn(true);
         service.excluir(1L);
 
         verify(osRepository).deleteById(1L);

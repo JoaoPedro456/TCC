@@ -33,6 +33,20 @@ public class GlobalExceptionHandler {
                 .body(Map.of("erro", ex.getMessage()));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("erro", "Valor de enum ou parâmetro inválido: " + ex.getMessage()));
+    }
+
+    @ExceptionHandler(java.time.format.DateTimeParseException.class)
+    public ResponseEntity<Map<String, String>> handleDateTimeParse(java.time.format.DateTimeParseException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("erro", "Formato de data inválido. Use o padrão yyyy-MM-dd: " + ex.getParsedString()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationException(MethodArgumentNotValidException ex) {
         String mensagem = ex.getBindingResult().getFieldErrors().stream()

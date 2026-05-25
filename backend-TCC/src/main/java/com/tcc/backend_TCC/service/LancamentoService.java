@@ -27,6 +27,25 @@ public class LancamentoService {
         return repository.findByTipoOrderByVencimentoAsc(tipo);
     }
 
+    public org.springframework.data.domain.Page<Lancamento> listarPorTipoPaginado(TipoLancamento tipo, org.springframework.data.domain.Pageable pageable) {
+        return repository.findByTipoOrderByVencimentoAsc(tipo, pageable);
+    }
+
+    public org.springframework.data.domain.Page<Lancamento> pesquisar(
+            TipoLancamento tipo, String statusStr, String busca, org.springframework.data.domain.Pageable pageable) {
+        
+        com.tcc.backend_TCC.enuns.StatusLancamento status = null;
+        if (statusStr != null && !statusStr.isBlank() && !"TODOS".equalsIgnoreCase(statusStr)) {
+            try {
+                status = com.tcc.backend_TCC.enuns.StatusLancamento.valueOf(statusStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException("Status inválido: " + statusStr);
+            }
+        }
+        
+        return repository.pesquisar(tipo, status, busca, pageable);
+    }
+
     public Lancamento criar(Lancamento lancamento) {
         log.info("Novo lancamento criado: {} - R${}", lancamento.getDescricao(), lancamento.getValor());
         return repository.save(lancamento);
@@ -66,5 +85,17 @@ public class LancamentoService {
         }
         repository.deleteById(id);
         log.info("Lancamento excluido: ID {}", id);
+    }
+
+    public java.util.Map<String, java.math.BigDecimal> getResumoFinanceiro() {
+        java.math.BigDecimal totalReceberPendente = repository.sumPendenteByTipo(TipoLancamento.RECEBER);
+        java.math.BigDecimal totalPagarPendente = repository.sumPendenteByTipo(TipoLancamento.PAGAR);
+        java.math.BigDecimal saldoAtual = repository.getSaldoAtual();
+
+        return java.util.Map.of(
+                "totalReceberPendente", totalReceberPendente,
+                "totalPagarPendente", totalPagarPendente,
+                "saldoAtual", saldoAtual
+        );
     }
 }

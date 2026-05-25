@@ -19,13 +19,19 @@ public class LancamentoController {
     private LancamentoService service;
 
     @GetMapping("/receber")
-    public List<Lancamento> listarReceber() {
-        return service.listarPorTipo(TipoLancamento.RECEBER);
+    public org.springframework.data.domain.Page<Lancamento> listarReceber(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String busca,
+            @org.springframework.data.web.PageableDefault(size = 10, sort = "vencimento", direction = org.springframework.data.domain.Sort.Direction.ASC) org.springframework.data.domain.Pageable pageable) {
+        return service.pesquisar(TipoLancamento.RECEBER, status, busca, pageable);
     }
 
     @GetMapping("/pagar")
-    public List<Lancamento> listarPagar() {
-        return service.listarPorTipo(TipoLancamento.PAGAR);
+    public org.springframework.data.domain.Page<Lancamento> listarPagar(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String busca,
+            @org.springframework.data.web.PageableDefault(size = 10, sort = "vencimento", direction = org.springframework.data.domain.Sort.Direction.ASC) org.springframework.data.domain.Pageable pageable) {
+        return service.pesquisar(TipoLancamento.PAGAR, status, busca, pageable);
     }
 
     @PostMapping
@@ -48,5 +54,10 @@ public class LancamentoController {
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
         service.excluir(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/resumo")
+    public java.util.Map<String, java.math.BigDecimal> getResumoFinanceiro() {
+        return service.getResumoFinanceiro();
     }
 }
