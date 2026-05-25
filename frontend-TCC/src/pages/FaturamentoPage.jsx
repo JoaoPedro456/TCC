@@ -6,8 +6,6 @@ import { useToast } from '../components/ToastProvider.jsx';
 export function FaturamentoPage() {
   const [abaAtiva, setAbaAtiva] = useState('RECEBER'); 
   const [loading, setLoading] = useState(false);
-  const [contasReceber, setContasReceber] = useState([]);
-  const [contasPagar, setContasPagar] = useState([]);
   
   // --- NOVOS ESTADOS PARA FILTRO E PAGINAÇÃO ---
   const [busca, setBusca] = useState('');
@@ -25,26 +23,57 @@ export function FaturamentoPage() {
 
   const { success, error } = useToast();
 
-  const carregarDados = async () => {
+  const [contas, setContas] = useState([]);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalElementos, setTotalElementos] = useState(0);
+  const [resumoFinanceiro, setResumoFinanceiro] = useState({ totalReceberPendente: 0, totalPagarPendente: 0, saldoAtual: 0 });
+
+  const carregarResumo = async () => {
+    try {
+      const res = await api.get('/financeiro/resumo');
+      setResumoFinanceiro(res.data);
+    } catch (err) {
+      console.error("Erro ao carregar resumo", err);
+    }
+  };
+
+  const carregarContas = async () => {
     setLoading(true);
     try {
-      const [resReceber, resPagar] = await Promise.all([
-        api.get('/financeiro/receber'),
-        api.get('/financeiro/pagar')
-      ]);
-      setContasReceber(resReceber.data);
-      setContasPagar(resPagar.data);
+      const params = {
+        page: paginaAtual - 1,
+        size: itensPorPagina,
+        busca: busca || undefined,
+        status: filtroStatus !== 'TODOS' ? filtroStatus : undefined
+      };
+      
+      const endpoint = abaAtiva === 'RECEBER' ? '/financeiro/receber' : '/financeiro/pagar';
+      const res = await api.get(endpoint, { params });
+      
+      setContas(res.data.content || []);
+      setTotalPaginas(res.data.totalPages || 1);
+      setTotalElementos(res.data.totalElements || 0);
     } catch (err) {
-      // console.error("Erro ao buscar dados", err);
       error("Erro ao carregar os dados financeiros.");
     } finally {
       setLoading(false);
     }
   };
 
+  const recarregarTudo = () => {
+    carregarContas();
+    carregarResumo();
+  };
+
+  // Carrega resumo inicial
   useEffect(() => {
-    carregarDados();
+    carregarResumo();
   }, []);
+
+  // Carrega contas quando mudam os filtros ou a página
+  useEffect(() => {
+    carregarContas();
+  }, [abaAtiva, busca, filtroStatus, paginaAtual]);
 
   // Toda vez que mudarmos a aba, a busca ou o status, voltamos para a página 1
   useEffect(() => {
@@ -61,7 +90,7 @@ export function FaturamentoPage() {
       success('Lançamento registrado!');
       setModalAberto(false);
       setForm(formInicial);
-      await carregarDados(); 
+      recarregarTudo(); 
     } catch (err) {
       error('Erro ao registrar lançamento.');
     } finally {
@@ -73,7 +102,7 @@ export function FaturamentoPage() {
     try {
       await api.put(`/financeiro/${id}/status?status=${novoStatus}`);
       success('Status atualizado!');
-      await carregarDados();
+      recarregarTudo();
     } catch (err) {
       error('Erro ao atualizar o status.');
     }
@@ -84,7 +113,7 @@ export function FaturamentoPage() {
     try {
       await api.delete(`/financeiro/${id}`);
       success('Lançamento excluído!');
-      await carregarDados();
+      recarregarTudo();
     } catch (err) {
       error('Erro ao excluir.');
     }
@@ -96,7 +125,7 @@ export function FaturamentoPage() {
       await api.put('/financeiro/status-lote?status=PAGO', selecionados);
       success(`${selecionados.length} contas marcadas como pagas com sucesso!`);
       setSelecionados([]);
-      await carregarDados();
+      recarregarTudo();
     } catch (err) {
       error('Erro ao dar baixa em lote.');
       setLoading(false);
@@ -115,12 +144,6 @@ export function FaturamentoPage() {
     }
   };
 
-  // Cálculos de Caixa (Totais Globais)
-  const totalReceberPendente = contasReceber.filter(c => c.status !== 'PAGO').reduce((acc, curr) => acc + curr.valor, 0);
-  const totalPagarPendente = contasPagar.filter(c => c.status !== 'PAGO').reduce((acc, curr) => acc + curr.valor, 0);
-  const saldoAtual = contasReceber.filter(c => c.status === 'PAGO').reduce((acc, curr) => acc + curr.valor, 0) - 
-                     contasPagar.filter(c => c.status === 'PAGO').reduce((acc, curr) => acc + curr.valor, 0);
-
   const formatarMoeda = (valor) => `R$ ${Number(valor).toFixed(2).replace('.', ',')}`;
   const formatarData = (dataString) => {
     if (!dataString) return '';
@@ -132,26 +155,9 @@ export function FaturamentoPage() {
   // LÓGICA DE FILTRAGEM E PAGINAÇÃO
   // ==========================================
   
-  // 1. Define qual lista estamos olhando (Receber ou Pagar)
-  const contasExibidasBase = abaAtiva === 'RECEBER' ? contasReceber : contasPagar;
-
-  // 2. Aplica o filtro de Texto e Status
-  const contasFiltradas = contasExibidasBase.filter(conta => {
-    const matchStatus = filtroStatus === 'TODOS' || conta.status === filtroStatus;
-    const termoBusca = busca.toLowerCase();
-    const matchBusca = conta.descricao.toLowerCase().includes(termoBusca) || 
-                       conta.envolvido.toLowerCase().includes(termoBusca);
-    return matchStatus && matchBusca;
-  });
-
-  // 3. Calcula a Paginação
-  const totalPaginas = Math.ceil(contasFiltradas.length / itensPorPagina);
-  const indexUltimoItem = paginaAtual * itensPorPagina;
-  const indexPrimeiroItem = indexUltimoItem - itensPorPagina;
-  
-  // 4. Corta a lista para mostrar apenas os 10 itens da página atual
-  const contasPaginadas = contasFiltradas.slice(indexPrimeiroItem, indexUltimoItem);
-
+  const contasPaginadas = contas;
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const indexUltimoItem = indexPrimeiroItem + contas.length;
   const totalSelecionado = contasPaginadas.filter(c => selecionados.includes(c.id)).reduce((acc, curr) => acc + curr.valor, 0);
 
   // ==========================================
@@ -177,9 +183,9 @@ export function FaturamentoPage() {
 
       {/* Cartões de Resumo */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-        <ResumoCard titulo="A Receber (Pendente)" valor={formatarMoeda(totalReceberPendente)} icone={<ArrowUpCircle size={24} />} cor="text-emerald-600" bg="bg-emerald-50" />
-        <ResumoCard titulo="A Pagar (Pendente)" valor={formatarMoeda(totalPagarPendente)} icone={<ArrowDownCircle size={24} />} cor="text-red-600" bg="bg-red-50" />
-        <ResumoCard titulo="Saldo Atual (Em Caixa)" valor={formatarMoeda(saldoAtual)} icone={<DollarSign size={24} />} cor={saldoAtual >= 0 ? "text-blue-600" : "text-red-600"} bg={saldoAtual >= 0 ? "bg-blue-50" : "bg-red-50"} />
+        <ResumoCard titulo="A Receber (Pendente)" valor={formatarMoeda(resumoFinanceiro.totalReceberPendente)} icone={<ArrowUpCircle size={24} />} cor="text-emerald-600" bg="bg-emerald-50" />
+        <ResumoCard titulo="A Pagar (Pendente)" valor={formatarMoeda(resumoFinanceiro.totalPagarPendente)} icone={<ArrowDownCircle size={24} />} cor="text-red-600" bg="bg-red-50" />
+        <ResumoCard titulo="Saldo Atual (Em Caixa)" valor={formatarMoeda(resumoFinanceiro.saldoAtual)} icone={<DollarSign size={24} />} cor={resumoFinanceiro.saldoAtual >= 0 ? "text-blue-600" : "text-red-600"} bg={resumoFinanceiro.saldoAtual >= 0 ? "bg-blue-50" : "bg-red-50"} />
       </div>
 
       {/* Área Principal - Listagem */}
@@ -319,7 +325,7 @@ export function FaturamentoPage() {
         {!loading && totalPaginas > 1 && (
           <div className="flex items-center justify-between p-4 border-t border-slate-100 bg-slate-50">
             <p className="text-sm text-slate-500">
-              Mostrando <span className="font-semibold text-slate-900">{indexPrimeiroItem + 1}</span> a <span className="font-semibold text-slate-900">{Math.min(indexUltimoItem, contasFiltradas.length)}</span> de <span className="font-semibold text-slate-900">{contasFiltradas.length}</span> registros
+              Mostrando <span className="font-semibold text-slate-900">{contasPaginadas.length > 0 ? indexPrimeiroItem + 1 : 0}</span> a <span className="font-semibold text-slate-900">{indexUltimoItem}</span> de <span className="font-semibold text-slate-900">{totalElementos}</span> registros
             </p>
             <div className="flex items-center gap-2">
               <button 

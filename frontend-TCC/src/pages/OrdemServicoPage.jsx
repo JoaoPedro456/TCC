@@ -569,9 +569,10 @@ export function OrdemServicoPage() {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
                       <input
                         type="number" step="0.01" placeholder="0.00"
-                        className="w-full border border-slate-200 pl-9 pr-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                        className={`w-full border border-slate-200 pl-9 pr-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition ${form.itensServico.length > 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                         value={form.valorServico}
                         onChange={e => atualizarCampoMagico('valorServico', e.target.value)}
+                        disabled={form.itensServico.length > 0}
                       />
                     </div>
                   </div>
