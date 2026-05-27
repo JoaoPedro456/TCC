@@ -8,6 +8,11 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
+@Table(name = "pessoa", indexes = {
+    @Index(name = "idx_pessoa_tipo_ativo", columnList = "tipo, ativo"),
+    @Index(name = "idx_pessoa_cpf", columnList = "cpf"),
+    @Index(name = "idx_pessoa_cnpj", columnList = "cnpj")
+})
 @Data
 @SQLDelete(sql = "UPDATE pessoa SET ativo = false WHERE id=?")
 public class Pessoa {

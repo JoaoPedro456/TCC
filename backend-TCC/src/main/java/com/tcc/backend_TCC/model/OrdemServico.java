@@ -14,6 +14,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
+@Table(name = "ordem_servico", indexes = {
+    @Index(name = "idx_os_status", columnList = "status"),
+    @Index(name = "idx_os_data_registo", columnList = "dataRegisto"),
+    @Index(name = "idx_os_ativo", columnList = "ativo")
+})
 @Data
 @SQLDelete(sql = "UPDATE ordem_servico SET ativo = false WHERE id=?")
 @SQLRestriction("ativo = true")

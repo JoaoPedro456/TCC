@@ -102,11 +102,14 @@ public class RelatorioService {
                 .map(os -> zeroSeNulo(os.getValorTotal()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        long totalClientes = pessoaRepository.findByTipo(TipoPessoa.CLIENTE).size();
-        long totalFuncionarios = pessoaRepository.findByTipo(TipoPessoa.FUNCIONARIO).size();
+        long totalClientes = pessoaRepository.countByTipo(TipoPessoa.CLIENTE);
+        long totalFuncionarios = pessoaRepository.countByTipo(TipoPessoa.FUNCIONARIO);
         long osAbertas = contarPorStatus(lista, "ABERTA");
         long osConcluidasMes = contarPorStatus(lista, "CONCLUIDA");
         long osHoje = lista.stream().filter(os -> os.getDataRegisto().equals(hoje)).count();
+        long hojeAbertas = lista.stream().filter(os -> os.getDataRegisto().equals(hoje) && os.getStatus() != null && "ABERTA".equals(os.getStatus().name())).count();
+        long hojeConcluidas = lista.stream().filter(os -> os.getDataRegisto().equals(hoje) && os.getStatus() != null && "CONCLUIDA".equals(os.getStatus().name())).count();
+        long hojeCanceladas = lista.stream().filter(os -> os.getDataRegisto().equals(hoje) && os.getStatus() != null && "CANCELADA".equals(os.getStatus().name())).count();
 
         BigDecimal ticketMedio = osConcluidasMes > 0
                 ? faturamentoMes.divide(BigDecimal.valueOf(osConcluidasMes), 2, RoundingMode.HALF_UP)
@@ -121,6 +124,9 @@ public class RelatorioService {
         dash.put("osAbertasMes", osAbertas);
         dash.put("osConcluidasMes", osConcluidasMes);
         dash.put("osHoje", osHoje);
+        dash.put("hojeAbertas", hojeAbertas);
+        dash.put("hojeConcluidas", hojeConcluidas);
+        dash.put("hojeCanceladas", hojeCanceladas);
         dash.put("osEmServico", contarPorStatus(lista, "EM_SERVICO"));
         dash.put("osAguardandoPeca", contarPorStatus(lista, "AGUARDANDO_PECA"));
         dash.put("osCanceladas", contarPorStatus(lista, "CANCELADA"));
@@ -128,15 +134,24 @@ public class RelatorioService {
         dash.put("totalClientes", totalClientes);
         dash.put("totalFuncionarios", totalFuncionarios);
 
-        // --- Adicionando Histórico de Faturamento dos últimos 6 meses ---
+        // --- Adicionando Histórico de Faturamento dos últimos 6 meses (otimizado para 1 query) ---
+        LocalDate inicioPeriodo = hoje.minusMonths(5).withDayOfMonth(1);
+        List<Object[]> faturamentoAgrupado = ordemServicoRepository.faturamentoMensalAgrupado(inicioPeriodo, hoje);
+        Map<String, BigDecimal> faturamentoMap = new HashMap<>();
+        for (Object[] row : faturamentoAgrupado) {
+            Integer ano = (Integer) row[0];
+            Integer mes = (Integer) row[1];
+            BigDecimal total = (BigDecimal) row[2];
+            faturamentoMap.put(ano + "-" + mes, total);
+        }
+
         List<Map<String, Object>> historicoFaturamento = new ArrayList<>();
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("MMM", new Locale("pt", "BR"));
         for (int i = 5; i >= 0; i--) {
             LocalDate inicioMes = hoje.minusMonths(i).withDayOfMonth(1);
-            LocalDate fimMes = hoje.minusMonths(i).withDayOfMonth(hoje.minusMonths(i).lengthOfMonth());
             
-            // Só considera OS concluídas
-            BigDecimal fatMes = zeroSeNulo(ordemServicoRepository.totalFaturadoPorPeriodo(inicioMes, fimMes));
+            String chave = inicioMes.getYear() + "-" + inicioMes.getMonthValue();
+            BigDecimal fatMes = zeroSeNulo(faturamentoMap.get(chave));
             
             Map<String, Object> dadosMes = new HashMap<>();
             String nomeMes = inicioMes.format(formatter);

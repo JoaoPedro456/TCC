@@ -31,6 +31,19 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
     Page<OrdemServico> findByStatus(StatusOS status, Pageable pageable);
 
     @EntityGraph(attributePaths = {"cliente", "mecanicos", "mecanicos.mecanico"})
+    @Query("SELECT os FROM OrdemServico os WHERE " +
+           "(:status IS NULL OR os.status = :status) AND " +
+           "(:busca IS NULL OR :busca = '' OR " +
+           " LOWER(os.cliente.nome) LIKE LOWER(CONCAT('%', :busca, '%')) OR " +
+           " LOWER(os.veiculo) LIKE LOWER(CONCAT('%', :busca, '%')) OR " +
+           " CAST(os.id AS string) LIKE CONCAT('%', :busca, '%'))")
+    Page<OrdemServico> pesquisar(
+            @Param("status") StatusOS status,
+            @Param("busca") String busca,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"cliente", "mecanicos", "mecanicos.mecanico"})
     List<OrdemServico> findByDataRegistoBetween(LocalDate inicio, LocalDate fim);
 
     // Corrigido: valorServico → valorTotal
@@ -38,6 +51,16 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
             "WHERE os.dataRegisto BETWEEN :inicio AND :fim " +
             "AND os.status = 'CONCLUIDA'")
     BigDecimal totalFaturadoPorPeriodo(
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim
+    );
+
+    @Query("SELECT YEAR(os.dataRegisto) as ano, MONTH(os.dataRegisto) as mes, COALESCE(SUM(os.valorTotal), 0) as total " +
+           "FROM OrdemServico os " +
+           "WHERE os.status = 'CONCLUIDA' " +
+           "AND os.dataRegisto BETWEEN :inicio AND :fim " +
+           "GROUP BY YEAR(os.dataRegisto), MONTH(os.dataRegisto)")
+    List<Object[]> faturamentoMensalAgrupado(
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim
     );

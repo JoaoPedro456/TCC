@@ -50,36 +50,56 @@ export function OrdemServicoPage() {
     setFiltroCatalogo('TODOS');
   };
 
-  const carregar = useCallback(async () => {
+  // 1. Carregar Clientes, Funcionários e Serviços apenas uma vez no mount
+  useEffect(() => {
+    const carregarMetadados = async () => {
+      try {
+        const [resPessoas, resServicos] = await Promise.all([
+          api.get('/pessoa'),
+          api.get('/servico'),
+        ]);
+        setClientes(resPessoas.data.filter(p => p.tipo === 'CLIENTE'));
+        setFuncionarios(resPessoas.data.filter(p => p.tipo === 'FUNCIONARIO'));
+        setServicos(resServicos.data);
+      } catch (err) {
+        error('Erro ao carregar dados complementares');
+      }
+    };
+    carregarMetadados();
+  }, [error]);
+
+  // 2. Carregar Ordens de Serviço paginadas e filtradas
+  const carregarOrdens = useCallback(async () => {
     try {
+      setLoading(true);
       const params = {
         page: paginaOS,
         size: 20,
+        busca: busca || undefined,
       };
       if (filtroStatus !== 'TODOS') {
         params.status = filtroStatus;
       }
 
-      const [resOrdens, resPessoas, resServicos] = await Promise.all([
-        api.get('/ordens', { params }),
-        api.get('/pessoa'),
-        api.get('/servico'),
-      ]);
-      setOrdens(resOrdens.data.content || []);
-      setTotalPaginasOS(resOrdens.data.totalPages || 1);
-      setTotalElementos(resOrdens.data.totalElements || 0);
-      setClientes(resPessoas.data.filter(p => p.tipo === 'CLIENTE'));
-      setFuncionarios(resPessoas.data.filter(p => p.tipo === 'FUNCIONARIO'));
-      setServicos(resServicos.data);
+      const res = await api.get('/ordens', { params });
+      setOrdens(res.data.content || []);
+      setTotalPaginasOS(res.data.totalPages || 1);
+      setTotalElementos(res.data.totalElements || 0);
     } catch (err) {
-      // console.error('Erro ao carregar dados', err);
-      error('Erro ao carregar dados');
+      error('Erro ao carregar ordens de serviço');
     } finally {
       setLoading(false);
     }
-  }, [error, paginaOS, filtroStatus]);
+  }, [error, paginaOS, filtroStatus, busca]);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregarOrdens();
+  }, [carregarOrdens]);
+
+  // 3. Resetar página para 0 ao mudar filtros de busca ou status
+  useEffect(() => {
+    setPaginaOS(0);
+  }, [filtroStatus, busca]);
 
   // --- NOVA FUNÇÃO MAGICA DE CALCULO ---
   // Atualiza um campo e recalcula o total imediatamente
@@ -193,7 +213,7 @@ export function OrdemServicoPage() {
       };
       await api.post('/ordens', payload);
       fecharModal();
-      await carregar();
+      await carregarOrdens();
       success('Ordem de Serviço criada com sucesso!');
     } catch (err) {
       // console.error('Erro ao salvar OS', err);
@@ -207,7 +227,7 @@ export function OrdemServicoPage() {
   const atualizarStatus = async (id, status) => {
     try {
       await api.put(`/ordens/${id}/status?status=${status}`);
-      await carregar();
+      await carregarOrdens();
       success('Status atualizado!');
     } catch {
       error('Erro ao atualizar status');
@@ -218,7 +238,7 @@ export function OrdemServicoPage() {
     if (!confirm('Excluir esta OS?')) return;
     try {
       await api.delete(`/ordens/${id}`);
-      await carregar();
+      await carregarOrdens();
       success('OS excluída com sucesso!');
     } catch {
       error('Erro ao excluir OS');
@@ -242,14 +262,7 @@ export function OrdemServicoPage() {
     }
   };
 
-  const ordensFiltradas = ordens.filter(o => {
-    const matchStatus = filtroStatus === 'TODOS' || o.status === filtroStatus;
-    const matchBusca = !busca ||
-      o.cliente?.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-      String(o.id).includes(busca) ||
-      (o.veiculo && o.veiculo.toLowerCase().includes(busca.toLowerCase()));
-    return matchStatus && matchBusca;
-  });
+  const ordensFiltradas = ordens;
 
   const servicosFiltradosCatalogo = servicos.filter(s => {
     const matchesSearch = s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase());

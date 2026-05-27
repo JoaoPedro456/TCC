@@ -73,31 +73,16 @@ export function DashboardPage() {
       }
 
       try {
-          const [resPessoas, resOrdens, resDash] = await Promise.all([
-            api.get('/pessoa'),
-            api.get('/ordens'),
+          const [resDash, resOrdens] = await Promise.all([
             api.get('/relatorios/dashboard'),
+            api.get('/ordens', { params: { size: 4, sort: 'id,desc' } })
           ]);
 
           const d = new Date();
           const year = d.getFullYear();
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          const hoje = `${year}-${month}-${day}`;
 
-          const listaDeOrdens = resOrdens.data.content || resOrdens.data || [];
-          const listaDePessoas = resPessoas.data.content || resPessoas.data || [];
-
-          const ordensHoje = Array.isArray(listaDeOrdens) 
-            ? listaDeOrdens.filter(o => o.dataRegisto === hoje)
-            : [];
-            
-          // Pegar as 4 últimas ordens para o Feed
-          if (Array.isArray(listaDeOrdens)) {
-            // Ordenar por ID decrescente para pegar as mais novas
-            const sorteadas = [...listaDeOrdens].sort((a,b) => b.id - a.id);
-            setUltimasOrdens(sorteadas.slice(0, 4));
-          }
+          const listaDeOrdens = resOrdens.data.content || [];
+          setUltimasOrdens(listaDeOrdens);
 
           const nomeMes = d.toLocaleString('pt-BR', { month: 'long' });
           const textoMes = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1) + ' de ' + year;
@@ -109,15 +94,15 @@ export function DashboardPage() {
           }
 
           setStats({
-            clientes: listaDePessoas.filter(p => p.tipo === 'CLIENTE').length,
-            funcionarios: listaDePessoas.filter(p => p.tipo === 'FUNCIONARIO').length,
+            clientes: resDash.data.totalClientes || 0,
+            funcionarios: resDash.data.totalFuncionarios || 0,
             faturamentoMes: resDash.data.faturamentoMes || 0,
             osMes: resDash.data.osMes || 0,
             osConcluidasMes: resDash.data.osConcluidasMes || 0,
-            ordensHojeTotal: ordensHoje.length,
-            hojeAbertas: ordensHoje.filter(o => o.status === 'ABERTA').length,
-            hojeConcluidas: ordensHoje.filter(o => o.status === 'CONCLUIDA').length,
-            hojeCanceladas: ordensHoje.filter(o => o.status === 'CANCELADA').length,
+            ordensHojeTotal: resDash.data.osHoje || 0,
+            hojeAbertas: resDash.data.hojeAbertas || 0,
+            hojeConcluidas: resDash.data.hojeConcluidas || 0,
+            hojeCanceladas: resDash.data.hojeCanceladas || 0,
           });
 
       } catch (err) {

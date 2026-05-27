@@ -135,6 +135,10 @@ public class OrdemServicoService {
         return repository.findByStatus(status, pageable);
     }
 
+    public Page<OrdemServico> pesquisar(StatusOS status, String busca, Pageable pageable) {
+        return repository.pesquisar(status, busca, pageable);
+    }
+
     public OrdemServico buscarPorId(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("OS não encontrada"));

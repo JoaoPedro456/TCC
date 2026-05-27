@@ -41,11 +41,13 @@ public class OrdemServicoController {
     @GetMapping
     public Page<OrdemServico> listar(
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String busca,
             @PageableDefault(size = 20) Pageable pageable) {
-        if (status != null && !status.isBlank()) {
-            return service.listarPorStatus(StatusOS.valueOf(status), pageable);
+        StatusOS statusEnum = null;
+        if (status != null && !status.isBlank() && !"TODOS".equals(status)) {
+            statusEnum = StatusOS.valueOf(status);
         }
-        return service.listarTodas(pageable);
+        return service.pesquisar(statusEnum, busca, pageable);
     }
 
     @GetMapping("/{id}")
