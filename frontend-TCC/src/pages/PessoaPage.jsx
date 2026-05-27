@@ -165,6 +165,24 @@ export function PessoaPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    const ehFisica = formData.tipoPessoaFisica;
+    const documento = ehFisica ? formData.cpf : formData.cnpj;
+
+    if (
+      !formData.nome?.trim() ||
+      !formData.telefone?.trim() ||
+      !documento?.trim() ||
+      !formData.cep?.trim() ||
+      !formData.logradouro?.trim() ||
+      !formData.numero?.trim() ||
+      !formData.bairro?.trim() ||
+      !formData.cidade?.trim() ||
+      !formData.estado?.trim()
+    ) {
+      error('Preencha todos os campos obrigatórios');
+      return;
+    }
+    
     if (formData.tipoPessoaFisica && formData.cpf && !validarCPF(formData.cpf)) {
       error('CPF inválido!');
       return;
@@ -353,7 +371,7 @@ export function PessoaPage() {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-3.5">
+            <form onSubmit={handleSubmit} className="p-6 space-y-3.5" noValidate>
               <input 
                 placeholder="Nome Completo *" 
                 value={formData.nome}
@@ -375,11 +393,12 @@ export function PessoaPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <input 
-                  placeholder="Telefone" 
+                  placeholder="Telefone *" 
                   value={formData.telefone}
                   maxLength="15"
                   className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
                   onChange={e => setFormData({ ...formData, telefone: formatarTelefone(e.target.value) })} 
+                  required
                 />
                 {formData.tipoPessoaFisica ? (
                   <input 
@@ -406,26 +425,29 @@ export function PessoaPage() {
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Endereço Completo</h4>
                 <div className="grid grid-cols-3 gap-3">
                   <input 
-                    placeholder="CEP" 
+                    placeholder="CEP *" 
                     value={formData.cep}
                     maxLength="9"
                     className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
                     onChange={e => setFormData({ ...formData, cep: formatarCEP(e.target.value) })} 
                     onBlur={() => buscarCEP(formData.cep)}
+                    required
                   />
                   <input 
-                    placeholder="Logradouro (Rua, Av.)" 
+                    placeholder="Logradouro (Rua, Av.) *" 
                     value={formData.logradouro}
                     className="w-full col-span-2 border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
                     onChange={e => setFormData({ ...formData, logradouro: e.target.value })} 
+                    required
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <input 
-                    placeholder="Número" 
+                    placeholder="Número *" 
                     value={formData.numero}
                     className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
                     onChange={e => setFormData({ ...formData, numero: e.target.value })} 
+                    required
                   />
                   <input 
                     placeholder="Complemento" 
@@ -436,23 +458,26 @@ export function PessoaPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <input 
-                    placeholder="Bairro" 
+                    placeholder="Bairro *" 
                     value={formData.bairro}
                     className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
                     onChange={e => setFormData({ ...formData, bairro: e.target.value })} 
+                    required
                   />
                   <input 
-                    placeholder="Cidade" 
+                    placeholder="Cidade *" 
                     value={formData.cidade}
                     className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
                     onChange={e => setFormData({ ...formData, cidade: e.target.value })} 
+                    required
                   />
                   <input 
-                    placeholder="UF" 
+                    placeholder="UF *" 
                     value={formData.estado}
                     maxLength="2"
                     className="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition uppercase"
                     onChange={e => setFormData({ ...formData, estado: e.target.value.toUpperCase() })} 
+                    required
                   />
                 </div>
               </div>
