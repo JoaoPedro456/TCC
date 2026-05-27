@@ -102,8 +102,8 @@ public class RelatorioService {
                 .map(os -> zeroSeNulo(os.getValorTotal()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        long totalClientes = pessoaRepository.countByTipo(TipoPessoa.CLIENTE);
-        long totalFuncionarios = pessoaRepository.countByTipo(TipoPessoa.FUNCIONARIO);
+        long totalClientes = pessoaRepository.countByTipoAndAtivoTrue(TipoPessoa.CLIENTE);
+        long totalFuncionarios = pessoaRepository.countByTipoAndAtivoTrue(TipoPessoa.FUNCIONARIO);
         long osAbertas = contarPorStatus(lista, "ABERTA");
         long osConcluidasMes = contarPorStatus(lista, "CONCLUIDA");
         long osHoje = lista.stream().filter(os -> os.getDataRegisto().equals(hoje)).count();
