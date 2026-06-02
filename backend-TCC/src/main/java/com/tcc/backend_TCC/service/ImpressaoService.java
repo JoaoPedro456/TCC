@@ -17,6 +17,7 @@ import com.tcc.backend_TCC.repository.OrdemServicoRepository;
 import com.tcc.backend_TCC.repository.PessoaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.lowagie.text.pdf.PdfGState;
 import java.awt.*;
 import java.io.ByteArrayOutputStream;
@@ -46,6 +47,7 @@ public class ImpressaoService {
     @Autowired
     private OrdemServicoRepository osRepository;
 
+    @Transactional(readOnly = true)
     public byte[] gerarPdfOs(Long osId) throws Exception {
         OrdemServico os = osRepository.findById(osId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("OS não encontrada"));
@@ -433,6 +435,7 @@ public class ImpressaoService {
     @Autowired
     private OrdemServicoMecanicoRepository mecanicoRepository;
 
+    @Transactional(readOnly = true)
     public byte[] gerarPdfComissao(Long funcId, LocalDate inicio, LocalDate fim) throws Exception {
         Pessoa func = pessoaRepository.findById(funcId).orElseThrow();
         // Busca as OSs onde ele trabalhou e que estão CONCLUÍDAS
