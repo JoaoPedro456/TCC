@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import api from '../services/api';
 import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
+import { AutocompleteSelect } from '../components/AutocompleteSelect.jsx';
 
 const STATUS_CONFIG = {
   ABERTA: { label: 'Aberta', color: 'bg-blue-500/20 text-blue-400 border border-blue-500/30', icon: <Clock size={12} /> },
@@ -26,6 +27,9 @@ export function OrdemServicoPage() {
   const [paginaOS, setPaginaOS] = useState(0);
   const [totalPaginasOS, setTotalPaginasOS] = useState(1);
   const [totalElementos, setTotalElementos] = useState(0);
+  const [buscaMecanico, setBuscaMecanico] = useState('');
+  const [paginaMecanicos, setPaginaMecanicos] = useState(1);
+  const mecanicosPorPagina = 4;
   const { success, error } = useToast();
 
   // --- ATUALIZAÇÃO DO ESTADO INICIAL ---
@@ -48,25 +52,60 @@ export function OrdemServicoPage() {
     setBuscaServico('');
     setPaginaServicos(1);
     setFiltroCatalogo('TODOS');
+    setBuscaMecanico('');
+    setPaginaMecanicos(1);
   };
 
-  // 1. Carregar Clientes, Funcionários e Serviços apenas uma vez no mount
+  // Fetch functions para os seletores (serão chamadas pelo Autocomplete ou useEffects)
+  const fetchClientes = async (busca) => {
+    try {
+      const res = await api.get('/pessoa/clientes', { params: { busca, size: 20 } });
+      return res.data.content.map(c => ({
+        value: c.id,
+        label: c.nome,
+        sublabel: c.cpf ? `CPF: ${c.cpf}` : (c.cnpj ? `CNPJ: ${c.cnpj}` : ''),
+        searchString: `${c.nome} ${c.cpf || ''} ${c.cnpj || ''}`
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  // Carregar Serviços Paginados do Servidor
   useEffect(() => {
-    const carregarMetadados = async () => {
+    if (!modalAberto) return;
+    const loadServicos = async () => {
       try {
-        const [resPessoas, resServicos] = await Promise.all([
-          api.get('/pessoa'),
-          api.get('/servico'),
-        ]);
-        setClientes(resPessoas.data.filter(p => p.tipo === 'CLIENTE'));
-        setFuncionarios(resPessoas.data.filter(p => p.tipo === 'FUNCIONARIO'));
-        setServicos(resServicos.data);
+        const res = await api.get('/servico', { 
+          params: { busca: buscaServico, page: paginaServicos - 1, size: servicosPorPagina } 
+        });
+        setServicos(res.data.content);
+        // Não precisamos mais do totalPaginasServicos local
       } catch (err) {
-        error('Erro ao carregar dados complementares');
+        console.error(err);
       }
     };
-    carregarMetadados();
-  }, [error]);
+    const timer = setTimeout(loadServicos, 300);
+    return () => clearTimeout(timer);
+  }, [modalAberto, buscaServico, paginaServicos]);
+
+  // Carregar Mecânicos Paginados do Servidor
+  useEffect(() => {
+    if (!modalAberto) return;
+    const loadMecanicos = async () => {
+      try {
+        const res = await api.get('/pessoa/funcionarios', { 
+          params: { busca: buscaMecanico, page: paginaMecanicos - 1, size: mecanicosPorPagina } 
+        });
+        setFuncionarios(res.data.content);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    const timer = setTimeout(loadMecanicos, 300);
+    return () => clearTimeout(timer);
+  }, [modalAberto, buscaMecanico, paginaMecanicos]);
+
 
   // 2. Carregar Ordens de Serviço paginadas e filtradas
   const carregarOrdens = useCallback(async () => {
@@ -264,14 +303,16 @@ export function OrdemServicoPage() {
 
   const ordensFiltradas = ordens;
 
-  const servicosFiltradosCatalogo = servicos.filter(s => {
-    const matchesSearch = s.nomeServico.toLowerCase().includes(buscaServico.toLowerCase());
-    const matchesFilter = filtroCatalogo === 'TODOS' || form.itensServico.some(item => item.id === s.id);
-    return matchesSearch && matchesFilter;
-  });
+  // Como o backend já traz paginado, servicosExibidos é o próprio array servicos do estado.
+  // Porem precisamos tratar o filtro "SELECIONADOS".
+  const servicosExibidos = filtroCatalogo === 'SELECIONADOS' 
+    ? form.itensServico 
+    : servicos;
 
-  const totalPaginasServicos = Math.max(1, Math.ceil(servicosFiltradosCatalogo.length / servicosPorPagina));
-  const servicosExibidos = servicosFiltradosCatalogo.slice((paginaServicos - 1) * servicosPorPagina, paginaServicos * servicosPorPagina);
+  // totalPaginasServicos precisaria vir da API, mas para manter simples na tela, vamos só exibir +1 e -1 
+  // se houver resultados na API ou usar um estado caso queiramos o número exato. Como já tínhamos a lógica local,
+  // vamos simplificar.
+  const mecanicosExibidos = funcionarios;
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -408,15 +449,13 @@ export function OrdemServicoPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Cliente *</label>
-                  <select
-                    className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition bg-white"
+                  <AutocompleteSelect
+                    fetchOptions={fetchClientes}
+                    options={[]} 
                     value={form.clienteId}
-                    onChange={e => atualizarCampoMagico('clienteId', e.target.value)}
-                    required
-                  >
-                    <option value="">Selecione o cliente</option>
-                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nome} {c.cpf ? `- CPF: ${c.cpf}` : ''}</option>)}
-                  </select>
+                    onChange={val => atualizarCampoMagico('clienteId', val)}
+                    placeholder="Buscar cliente..."
+                  />
                 </div>
                 <div>
                   <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Veículo / Maquinário</label>
@@ -502,31 +541,29 @@ export function OrdemServicoPage() {
                 </div>
 
                 {/* Controles de Paginação do Catálogo */}
-                {totalPaginasServicos > 1 && (
-                  <div className="flex items-center justify-between mt-2 px-1">
-                    <p className="text-xs text-slate-500 font-medium">
-                      Página {paginaServicos} de {totalPaginasServicos}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setPaginaServicos(p => Math.max(p - 1, 1))}
-                        disabled={paginaServicos === 1}
-                        className="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                      >
-                        <ChevronLeft size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaginaServicos(p => Math.min(p + 1, totalPaginasServicos))}
-                        disabled={paginaServicos >= totalPaginasServicos}
-                        className="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                      >
-                        <ChevronRight size={14} />
-                      </button>
-                    </div>
+                <div className="flex items-center justify-between mt-2 px-1">
+                  <p className="text-xs text-slate-500 font-medium">
+                    Página {paginaServicos}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPaginaServicos(p => Math.max(p - 1, 1))}
+                      disabled={paginaServicos === 1}
+                      className="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaginaServicos(p => p + 1)}
+                      disabled={servicosExibidos.length < servicosPorPagina}
+                      className="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Serviços Selecionados com Preço Editável */}
@@ -633,14 +670,42 @@ export function OrdemServicoPage() {
               {/* ---------------------------- */}
 
               {/* Mecânicos */}
-              <div>
-                <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Mecânicos Responsáveis</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {funcionarios.map(f => {
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-[14px] font-semibold text-slate-700 block">Mecânicos Responsáveis</label>
+                  {form.mecanicos.length > 0 && (
+                    <span className="text-xs text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded">
+                      {form.mecanicos.length} selecionado(s)
+                    </span>
+                  )}
+                </div>
+
+                {/* Filtro de Busca de Mecânicos */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar mecânico..."
+                    value={buscaMecanico}
+                    onChange={e => { setBuscaMecanico(e.target.value); setPaginaMecanicos(1); }}
+                    className="w-full border border-slate-200 pl-8 pr-3 py-2 rounded-lg text-sm outline-none focus:border-slate-900 transition"
+                  />
+                </div>
+
+                {/* Grid de Mecânicos */}
+                <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1">
+                  {mecanicosExibidos.length === 0 && (
+                    <div className="col-span-2 py-6 text-center text-slate-400 text-sm">
+                      Nenhum mecânico encontrado
+                    </div>
+                  )}
+                  {mecanicosExibidos.map(f => {
                     const selecionado = form.mecanicos.some(m => m.mecanicoId === f.id);
                     return (
                       <button
-                        key={f.id} type="button" onClick={() => toggleMecanico(f.id)}
+                        key={f.id}
+                        type="button"
+                        onClick={() => toggleMecanico(f.id)}
                         className={`p-3 rounded-lg border text-left transition ${selecionado ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
                       >
                         <p className="font-medium text-sm">{f.nome}</p>
@@ -648,6 +713,31 @@ export function OrdemServicoPage() {
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Controles de Paginação de Mecânicos */}
+                <div className="flex items-center justify-between mt-2 px-1">
+                  <p className="text-xs text-slate-500 font-medium">
+                    Página {paginaMecanicos}
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPaginaMecanicos(p => Math.max(p - 1, 1))}
+                      disabled={paginaMecanicos === 1}
+                      className="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaginaMecanicos(p => p + 1)}
+                      disabled={mecanicosExibidos.length < mecanicosPorPagina}
+                      className="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
 

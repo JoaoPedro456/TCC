@@ -15,6 +15,13 @@ public class ItemServicoService {
     @Autowired
     private ItemServicoRepository repository;
 
+    public org.springframework.data.domain.Page<ItemServico> listarTodos(String busca, org.springframework.data.domain.Pageable pageable) {
+        if (busca != null && !busca.trim().isEmpty()) {
+            return repository.pesquisarPorNome(busca, pageable);
+        }
+        return repository.findByAtivoTrue(pageable);
+    }
+
     public List<ItemServico> listarTodos() {
         return repository.findByAtivoTrue();
     }

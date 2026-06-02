@@ -127,21 +127,32 @@ public class OrdemServicoService {
         return repository.save(os);
     }
 
+    @Transactional(readOnly = true)
     public Page<OrdemServico> listarTodas(Pageable pageable) {
-        return repository.findAll(pageable);
+        Page<OrdemServico> page = repository.findAll(pageable);
+        page.getContent().forEach(os -> os.getItensServico().size());
+        return page;
     }
 
+    @Transactional(readOnly = true)
     public Page<OrdemServico> listarPorStatus(StatusOS status, Pageable pageable) {
-        return repository.findByStatus(status, pageable);
+        Page<OrdemServico> page = repository.findByStatus(status, pageable);
+        page.getContent().forEach(os -> os.getItensServico().size());
+        return page;
     }
 
+    @Transactional(readOnly = true)
     public Page<OrdemServico> pesquisar(StatusOS status, String busca, Pageable pageable) {
-        return repository.pesquisar(status, busca, pageable);
+        Page<OrdemServico> page = repository.pesquisar(status, busca, pageable);
+        page.getContent().forEach(os -> os.getItensServico().size());
+        return page;
     }
 
+    @Transactional(readOnly = true)
     public OrdemServico buscarPorId(Long id) {
-        return repository.findById(id)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("OS não encontrada"));
+        OrdemServico os = repository.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("OS não encontrada"));
+        os.getItensServico().size();
+        return os;
     }
 
     // 👇 2. A MÁGICA ACONTECE AQUI

@@ -59,6 +59,7 @@ public class OrdemServico {
     @Enumerated(EnumType.STRING)
     private StatusOS status = StatusOS.ABERTA;
 
+    @org.hibernate.annotations.BatchSize(size = 50)
     @OneToMany(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrdemServicoItem> itensServico = new ArrayList<>();
 

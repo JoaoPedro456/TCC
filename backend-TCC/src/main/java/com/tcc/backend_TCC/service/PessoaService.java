@@ -17,6 +17,20 @@ public class PessoaService {
     @Autowired
     private PessoaRepository repository;
 
+    public org.springframework.data.domain.Page<Pessoa> listarTodas(String busca, org.springframework.data.domain.Pageable pageable) {
+        if (busca != null && !busca.trim().isEmpty()) {
+            return repository.pesquisarPorNome(busca, pageable);
+        }
+        return repository.findByAtivoTrue(pageable);
+    }
+
+    public org.springframework.data.domain.Page<Pessoa> listarPorTipo(TipoPessoa tipo, String busca, org.springframework.data.domain.Pageable pageable) {
+        if (busca != null && !busca.trim().isEmpty()) {
+            return repository.pesquisarPorNomeETipo(busca, tipo, pageable);
+        }
+        return repository.findByTipoAndAtivoTrue(tipo, pageable);
+    }
+
     public List<Pessoa> listarTodas() {
         return repository.findByAtivoTrue();
     }

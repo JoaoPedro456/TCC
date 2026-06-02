@@ -10,6 +10,9 @@ export function PessoaPage() {
   const [busca, setBusca] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('TODOS');
   const [loading, setLoading] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalItens, setTotalItens] = useState(0);
   const [formData, setFormData] = useState({
     nome: '', tipo: 'CLIENTE', tipoPessoaFisica: true, cpf: '', cnpj: '', telefone: '',
     cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
@@ -117,17 +120,38 @@ export function PessoaPage() {
   // 2. Função para carregar dados da API
   const carregar = async () => {
     try {
-      const res = await api.get('/pessoa');
-      setPessoas(res.data);
+      setLoading(true);
+      let endpoint = '/pessoa';
+      if (filtroTipo === 'CLIENTE') endpoint = '/pessoa/clientes';
+      if (filtroTipo === 'FUNCIONARIO') endpoint = '/pessoa/funcionarios';
+
+      const res = await api.get(endpoint, {
+        params: {
+          busca,
+          page: pagina - 1,
+          size: 15
+        }
+      });
+      setPessoas(res.data.content);
+      setTotalPaginas(res.data.totalPages);
+      setTotalItens(res.data.totalElements);
     } catch (err) {
-      // console.error('Erro ao carregar pessoas:', err);
       error('Erro ao carregar dados do servidor.');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    carregar();
-  }, []);
+    setPagina(1);
+  }, [busca, filtroTipo]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      carregar();
+    }, 300); // debounce de 300ms
+    return () => clearTimeout(handler);
+  }, [busca, filtroTipo, pagina]);
 
   // 3. Função para abrir modal de edição
   const handleEditar = (p) => {
@@ -235,20 +259,14 @@ export function PessoaPage() {
     }
   };
 
-  const listaFiltrada = pessoas.filter(p => {
-    const matchTipo = filtroTipo === 'TODOS' || p.tipo === filtroTipo;
-    const matchBusca = !busca || 
-      p.nome?.toLowerCase().includes(busca.toLowerCase()) || 
-      p.cpf?.includes(busca) || p.cnpj?.includes(busca);
-    return matchTipo && matchBusca;
-  });
+  const listaFiltrada = pessoas; // Agora o filtro é no backend
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-end flex-wrap gap-4 mb-8">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Clientes & Equipe</h2>
-          <p className="text-slate-500 text-sm mt-1">{pessoas.length} registros no banco</p>
+          <p className="text-slate-500 text-sm mt-1">{totalItens} registros no banco</p>
         </div>
         <button
           onClick={() => { fecharModal(); setModalAberto(true); }}
@@ -358,6 +376,30 @@ export function PessoaPage() {
             )}
           </tbody>
         </table>
+        
+        {totalPaginas > 1 && (
+          <div className="bg-white px-5 py-4 border-t border-slate-200 flex items-center justify-between">
+            <span className="text-sm text-slate-500">
+              Página {pagina} de {totalPaginas}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPagina(p => Math.max(p - 1, 1))}
+                disabled={pagina === 1 || loading}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setPagina(p => Math.min(p + 1, totalPaginas))}
+                disabled={pagina === totalPaginas || loading}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {modalAberto && (

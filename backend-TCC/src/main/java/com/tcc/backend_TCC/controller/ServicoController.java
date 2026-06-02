@@ -18,7 +18,14 @@ public class ServicoController {
     private ItemServicoService service;
 
     @GetMapping
-    public List<ItemServico> listar() {
+    public org.springframework.data.domain.Page<ItemServico> listar(
+            @RequestParam(required = false) String busca,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return service.listarTodos(busca, pageable);
+    }
+
+    @GetMapping("/todos-sem-paginacao")
+    public List<ItemServico> listarTodosSemPaginacao() {
         return service.listarTodos();
     }
 

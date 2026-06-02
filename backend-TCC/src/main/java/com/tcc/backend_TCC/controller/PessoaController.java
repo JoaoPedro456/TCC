@@ -22,18 +22,29 @@ public class PessoaController {
     private PessoaService service;
 
     @GetMapping
-    public List<Pessoa> listar() {
-        return service.listarTodas();
+    public org.springframework.data.domain.Page<Pessoa> listar(
+            @RequestParam(required = false) String busca,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return service.listarTodas(busca, pageable);
     }
 
     @GetMapping("/clientes")
-    public List<Pessoa> listarClientes() {
-        return service.listarPorTipo(TipoPessoa.CLIENTE);
+    public org.springframework.data.domain.Page<Pessoa> listarClientes(
+            @RequestParam(required = false) String busca,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return service.listarPorTipo(TipoPessoa.CLIENTE, busca, pageable);
     }
 
     @GetMapping("/funcionarios")
-    public List<Pessoa> listarFuncionarios() {
-        return service.listarPorTipo(TipoPessoa.FUNCIONARIO);
+    public org.springframework.data.domain.Page<Pessoa> listarFuncionarios(
+            @RequestParam(required = false) String busca,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return service.listarPorTipo(TipoPessoa.FUNCIONARIO, busca, pageable);
+    }
+
+    @GetMapping("/todos-sem-paginacao")
+    public List<Pessoa> listarTodosSemPaginacao() {
+        return service.listarTodas();
     }
 
     @PostMapping

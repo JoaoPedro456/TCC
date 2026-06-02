@@ -6,26 +6,35 @@ import { useToast } from '../components/ToastProvider.jsx';
 export function ServicoPage() {
   const [servicos, setServicos] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
-  const [idEdicao, setIdEdicao] = useState(null); // <-- Estado para controlar a edição
+  const [idEdicao, setIdEdicao] = useState(null); 
   const [busca, setBusca] = useState('');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ nomeServico: '', precoTabela: '' });
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   
   const { success, error } = useToast();
 
   const carregar = async () => {
     try {
-      const res = await api.get('/servico');
-      setServicos(res.data);
+      const res = await api.get('/servico', {
+        params: { busca, page: pagina - 1, size: 15 }
+      });
+      setServicos(res.data.content);
+      setTotalPaginas(res.data.totalPages);
     } catch (err) {
-      // console.error("Erro ao carregar servicos", err);
       error('Erro ao carregar catálogo');
     }
   };
 
+  useEffect(() => {
+    setPagina(1);
+  }, [busca]);
+
   useEffect(() => { 
-    carregar(); 
-  }, []);
+    const timer = setTimeout(carregar, 300);
+    return () => clearTimeout(timer);
+  }, [busca, pagina]);
 
   // --- NOVAS FUNÇÕES DE EDIÇÃO ---
   const handleEditar = (servico) => {
@@ -90,9 +99,7 @@ export function ServicoPage() {
     }
   };
 
-  const listaFiltrada = servicos.filter(s =>
-    !busca || s.nomeServico?.toLowerCase().includes(busca.toLowerCase())
-  );
+  const listaFiltrada = servicos;
 
   return (
     <div>
@@ -159,6 +166,33 @@ export function ServicoPage() {
           </div>
         ))}
       </div>
+
+      {/* Controles de Paginação */}
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-between mt-6 px-1">
+          <p className="text-sm text-slate-500">
+            Página {pagina} de {totalPaginas}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPagina(p => Math.max(p - 1, 1))}
+              disabled={pagina === 1}
+              className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPagina(p => Math.min(p + 1, totalPaginas))}
+              disabled={pagina === totalPaginas}
+              className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {modalAberto && (

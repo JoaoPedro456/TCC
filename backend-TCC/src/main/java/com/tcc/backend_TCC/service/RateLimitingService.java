@@ -123,16 +123,18 @@ public class RateLimitingService {
             }
         }
 
-        // Se foi bloqueado, registra no PostgreSQL para auditoria
+        // Se foi bloqueado, registra no PostgreSQL para auditoria de forma ASSÍNCRONA
+        // Isso evita que um ataque de força bruta bloqueie as threads do Tomcat aguardando o banco.
         if (blockReason != null) {
-            try {
-                logRepository.save(new RateLimitLog(ipAddress, username, blockReason));
-                System.out.println("[RateLimit] LOG SALVO NO BANCO COM SUCESSO!");
-            } catch (Exception e) {
-                // Falha no log não deve impedir o bloqueio
-                e.printStackTrace();
-                System.err.println("[RateLimit] Erro ao salvar log no banco: " + e.getMessage());
-            }
+            final String finalBlockReason = blockReason;
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    logRepository.save(new RateLimitLog(ipAddress, username, finalBlockReason));
+                    System.out.println("[RateLimit] LOG SALVO NO BANCO COM SUCESSO! (Async)");
+                } catch (Exception e) {
+                    System.err.println("[RateLimit] Erro ao salvar log no banco: " + e.getMessage());
+                }
+            });
         }
 
         return blockReason == null;

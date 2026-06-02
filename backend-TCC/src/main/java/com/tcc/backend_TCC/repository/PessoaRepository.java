@@ -14,8 +14,20 @@ public interface PessoaRepository extends JpaRepository<Pessoa, Long> {
 
     long countByTipo(TipoPessoa tipo);
 
-    List<Pessoa> findByAtivoTrue();
+    // Métodos para paginação e busca geral
+    org.springframework.data.domain.Page<Pessoa> findByAtivoTrue(org.springframework.data.domain.Pageable pageable);
+    
+    @Query("SELECT p FROM Pessoa p WHERE p.ativo = true AND LOWER(p.nome) LIKE LOWER(CONCAT('%', :busca, '%'))")
+    org.springframework.data.domain.Page<Pessoa> pesquisarPorNome(String busca, org.springframework.data.domain.Pageable pageable);
 
+    // Métodos para paginação e busca por tipo
+    org.springframework.data.domain.Page<Pessoa> findByTipoAndAtivoTrue(TipoPessoa tipo, org.springframework.data.domain.Pageable pageable);
+
+    @Query("SELECT p FROM Pessoa p WHERE p.ativo = true AND p.tipo = :tipo AND LOWER(p.nome) LIKE LOWER(CONCAT('%', :busca, '%'))")
+    org.springframework.data.domain.Page<Pessoa> pesquisarPorNomeETipo(String busca, TipoPessoa tipo, org.springframework.data.domain.Pageable pageable);
+
+    // Métodos sem paginação (mantidos caso algo precise, ou podem ser removidos futuramente se não usados)
+    List<Pessoa> findByAtivoTrue();
     List<Pessoa> findByTipoAndAtivoTrue(TipoPessoa tipo);
 
     long countByTipoAndAtivoTrue(TipoPessoa tipo);

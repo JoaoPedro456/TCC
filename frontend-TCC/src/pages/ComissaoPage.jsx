@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Users, DollarSign, Printer, Search, TrendingUp } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
+import { AutocompleteSelect } from '../components/AutocompleteSelect.jsx';
 
 export function ComissaoPage() {
   const [funcionarios, setFuncionarios] = useState([]);
@@ -10,9 +11,28 @@ export function ComissaoPage() {
   const [loading, setLoading] = useState(false);
   const { success, error } = useToast();
 
-  useEffect(() => {
-    api.get('/pessoa').then(res => setFuncionarios(res.data.filter(p => p.tipo === 'FUNCIONARIO')));
-  }, []);
+  // Removemos o carregamento inicial em massa para evitar OutOfMemory.
+  // useEffect(() => {
+  //   api.get('/pessoa').then(res => setFuncionarios(res.data.content.filter(p => p.tipo === 'FUNCIONARIO')));
+  // }, []);
+
+  const fetchFuncionarios = async (busca) => {
+    try {
+      const res = await api.get('/pessoa/funcionarios', {
+        params: { busca, size: 20 }
+      });
+      return res.data.content.map(f => ({
+        value: f.id,
+        label: f.nome,
+        sublabel: f.cargo ? `Cargo: ${f.cargo}` : '',
+        searchString: `${f.nome} ${f.cargo || ''}`,
+        // guardamos os dados originais se precisarmos
+        original: f
+      }));
+    } catch (err) {
+      return [];
+    }
+  };
 
   const buscarComissoes = async () => {
     if (!filtro.funcionarioId) return error('Selecione um funcionário');
@@ -23,9 +43,10 @@ export function ComissaoPage() {
       const inicio = `${filtro.ano}-${String(filtro.mes).padStart(2, '0')}-01`;
       const fim = `${filtro.ano}-${String(filtro.mes).padStart(2, '0')}-${ultimoDia}`;
       
-      // 1. Vai buscar o funcionário selecionado diretamente à lista de cadastros
-      const funcSelecionado = funcionarios.find(f => f.id === Number(filtro.funcionarioId));
-      const salario = Number(funcSelecionado?.salarioBase || 0);
+      // Busca os dados do funcionário selecionado na API, já que não temos mais a lista completa em memória
+      const funcRes = await api.get(`/pessoa/${filtro.funcionarioId}`);
+      const salario = Number(funcRes.data?.salarioBase || 0);
+
       const res = await api.get(`/relatorios/comissao-resumo?funcionarioId=${filtro.funcionarioId}&inicio=${inicio}&fim=${fim}`);
 
       const comissao = Number(res.data.totalComissao || 0);
@@ -80,14 +101,13 @@ export function ComissaoPage() {
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex gap-4 items-end">
         <div className="flex-1">
           <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Funcionário</label>
-          <select 
-            className="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:border-blue-500 transition bg-white"
+          <AutocompleteSelect
+            fetchOptions={fetchFuncionarios}
+            options={[]} // Não usa mais a lista estática
             value={filtro.funcionarioId}
-            onChange={e => setFiltro({...filtro, funcionarioId: e.target.value})}
-          >
-            <option value="">Selecione...</option>
-            {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome} - {f.cargo}</option>)}
-          </select>
+            onChange={val => setFiltro({...filtro, funcionarioId: val})}
+            placeholder="Buscar funcionário..."
+          />
         </div>
         <div className="w-40">
           <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Mês</label>
