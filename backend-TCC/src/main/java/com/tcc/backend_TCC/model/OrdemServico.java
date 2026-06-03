@@ -38,6 +38,8 @@ public class OrdemServico {
 
     private LocalDate dataRegisto = LocalDate.now();
 
+    private LocalDate dataRealizacao;
+
     @Size(max = 500, message = "Observação deve ter no máximo 500 caracteres")
     private String observacao;
 

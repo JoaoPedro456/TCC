@@ -35,6 +35,7 @@ export function OrdemServicoPage() {
   // --- ATUALIZAÇÃO DO ESTADO INICIAL ---
   const formInicial = {
     clienteId: '',
+    dataRealizacao: '',
     observacao: '',
     veiculo: '',
     quilometragem: '',
@@ -239,6 +240,7 @@ export function OrdemServicoPage() {
     try {
       const payload = {
         cliente: { id: Number(form.clienteId) },
+        dataRealizacao: form.dataRealizacao ? form.dataRealizacao : null,
         observacao: form.observacao,
         veiculo: form.veiculo || null,
         quilometragem: form.quilometragem ? Number(form.quilometragem) : null,
@@ -464,6 +466,19 @@ export function OrdemServicoPage() {
                     className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition"
                     value={form.veiculo}
                     onChange={e => atualizarCampoMagico('veiculo', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Linha 1.5: Data de Realização */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[14px] font-semibold text-slate-700 block mb-1.5">Data de Realização</label>
+                  <input
+                    type="date"
+                    className="w-full border border-slate-200 px-3 py-2.5 rounded-lg text-sm outline-none focus:border-slate-900 transition text-slate-600"
+                    value={form.dataRealizacao}
+                    onChange={e => atualizarCampoMagico('dataRealizacao', e.target.value)}
                   />
                 </div>
               </div>

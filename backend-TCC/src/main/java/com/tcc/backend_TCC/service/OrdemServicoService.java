@@ -53,6 +53,7 @@ public class OrdemServicoService {
         }
 
         os.setObservacao(dto.getObservacao());
+        os.setDataRealizacao(dto.getDataRealizacao());
         os.setVeiculo(dto.getVeiculo());
         os.setQuilometragem(dto.getQuilometragem());
 

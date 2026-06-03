@@ -17,6 +17,8 @@ public class OrdemServicoDTO {
     @Size(max = 500, message = "Observação deve ter no máximo 500 caracteres")
     private String observacao;
 
+    private java.time.LocalDate dataRealizacao;
+
     @Size(max = 100, message = "Veículo deve ter no máximo 100 caracteres")
     private String veiculo;
 
