@@ -316,12 +316,6 @@ export function OrdemServicoPage() {
   // vamos simplificar.
   const mecanicosExibidos = funcionarios;
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" />
-    </div>
-  );
-
   return (
     <div>
       {/* Header */}
@@ -356,13 +350,18 @@ export function OrdemServicoPage() {
 
       {/* Lista de OS */}
       <div className="space-y-3">
-        {ordensFiltradas.length === 0 && (
+        {loading && (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" />
+          </div>
+        )}
+        {!loading && ordensFiltradas.length === 0 && (
           <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
             <ClipboardList size={40} className="text-slate-300 mx-auto mb-3" />
             <p className="text-slate-400 font-medium">Nenhuma ordem encontrada</p>
           </div>
         )}
-        {ordensFiltradas.map(os => {
+        {!loading && ordensFiltradas.map(os => {
           const st = STATUS_CONFIG[os.status] || STATUS_CONFIG.ABERTA;
           return (
             <div key={os.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
@@ -407,7 +406,7 @@ export function OrdemServicoPage() {
       </div>
 
       {/* Paginação */}
-      {totalPaginasOS > 1 && (
+      {!loading && totalPaginasOS > 1 && (
         <div className="flex items-center justify-between mt-6 bg-white rounded-xl border border-slate-200 px-5 py-3">
           <p className="text-sm text-slate-500">
             Página {paginaOS + 1} de {totalPaginasOS}

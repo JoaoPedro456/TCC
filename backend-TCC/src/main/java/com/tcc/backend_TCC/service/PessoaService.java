@@ -39,6 +39,11 @@ public class PessoaService {
         return repository.findByTipoAndAtivoTrue(tipo);
     }
 
+    public Pessoa buscarPorId(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pessoa nao encontrada"));
+    }
+
     public Pessoa salvar(Pessoa p) {
         // Se for CPF, verifica se existe registro inativo e reativa/atualiza
         if (p.getCpf() != null && !p.getCpf().trim().isEmpty()) {

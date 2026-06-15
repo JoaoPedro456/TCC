@@ -47,6 +47,11 @@ public class PessoaController {
         return service.listarTodas();
     }
 
+    @GetMapping("/{id}")
+    public Pessoa buscarPorId(@PathVariable Long id) {
+        return service.buscarPorId(id);
+    }
+
     @PostMapping
     public ResponseEntity<Pessoa> criar(@Valid @RequestBody Pessoa p) {
         log.info("Recebida requisicao para criar pessoa: {}", p.getNome());
