@@ -9,8 +9,10 @@ import {
   PieChart,
   LogOut,
   Settings,
-  X,
-  Lock
+  Lock,
+  FileText,
+  PackageOpen,
+  X
 } from 'lucide-react';
 import { useState } from 'react';
 import api from '../services/api';
@@ -18,9 +20,11 @@ import { useToast } from './ToastProvider';
 
 const ROUTE_MAP = {
   dashboard: '/dashboard',
+  orcamentos: '/orcamentos',
   os: '/ordens',
   pessoas: '/pessoas',
   catalogo: '/catalogo',
+  materiais: '/materiais',
   faturamento: '/faturamento',
   comissoes: '/comissoes',
   relatorios: '/relatorios',
@@ -43,9 +47,11 @@ export function Sidebar() {
 
   const menuPrincipal = [
     { id: 'dashboard', nome: 'Dashboard', icone: LayoutDashboard },
+    { id: 'orcamentos', nome: 'Orçamentos', icone: FileText },
     { id: 'os', nome: 'Ordens de Serviço', icone: ClipboardList },
     { id: 'pessoas', nome: 'Clientes & Equipe', icone: Users },
     { id: 'catalogo', nome: 'Catálogo de Serviços', icone: Wrench },
+    { id: 'materiais', nome: 'Catálogo de Materiais', icone: PackageOpen },
   ];
 
   const menuFinanceiro = [

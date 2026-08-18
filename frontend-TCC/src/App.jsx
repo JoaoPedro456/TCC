@@ -4,9 +4,11 @@ import { ToastProvider } from './components/ToastProvider';
 import { limparTokenSeExpirado } from './utils/token';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { OrcamentoPage } from './pages/OrcamentoPage';
 import { OrdemServicoPage } from './pages/OrdemServicoPage';
 import { PessoaPage } from './pages/PessoaPage';
 import { ServicoPage } from './pages/ServicoPage';
+import { MaterialPage } from './pages/MaterialPage';
 import { FaturamentoPage } from './pages/FaturamentoPage';
 import { ComissaoPage } from './pages/ComissaoPage';
 import { RelatorioPage } from './pages/RelatorioPage';
@@ -20,9 +22,11 @@ function AppLayout() {
         <div className="p-8">
           <Routes>
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/orcamentos" element={<OrcamentoPage />} />
             <Route path="/ordens" element={<OrdemServicoPage />} />
             <Route path="/pessoas" element={<PessoaPage />} />
             <Route path="/catalogo" element={<ServicoPage />} />
+            <Route path="/materiais" element={<MaterialPage />} />
             <Route path="/faturamento" element={<FaturamentoPage />} />
             <Route path="/comissoes" element={<ComissaoPage />} />
             <Route path="/relatorios" element={<RelatorioPage />} />

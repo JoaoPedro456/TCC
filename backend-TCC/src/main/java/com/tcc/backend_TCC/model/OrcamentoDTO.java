@@ -8,16 +8,12 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Data
-public class OrdemServicoDTO {
+public class OrcamentoDTO {
 
-    @NotNull(message = "Cliente é obrigatório")
-    @Valid
     private ClienteDTO cliente;
 
     @Size(max = 500, message = "Observação deve ter no máximo 500 caracteres")
     private String observacao;
-
-    private java.time.LocalDate dataRealizacao;
 
     @Size(max = 100, message = "Veículo deve ter no máximo 100 caracteres")
     private String veiculo;
@@ -25,38 +21,33 @@ public class OrdemServicoDTO {
     @DecimalMin(value = "0.0", message = "Quilometragem não pode ser negativa")
     private Double quilometragem;
 
-    // --- NOVO CAMPO: Valor cobrado por KM ---
     @DecimalMin(value = "0.0", message = "Valor do KM não pode ser negativo")
     private BigDecimal valorKm;
+
+    @DecimalMin(value = "0.0", message = "Desconto não pode ser negativo")
+    private BigDecimal valorDesconto;
 
     @NotNull(message = "Valor total é obrigatório")
     @DecimalMin(value = "0.0", message = "Valor total não pode ser negativo")
     private BigDecimal valorTotal;
 
-    private List<OrdemServicoItemDTO> itensServico;
+    private List<OrcamentoItemDTO> itensServico;
 
-    private List<OrdemServicoMaterialDTO> materiais;
-
-    @NotEmpty(message = "É necessário associar pelo menos um mecânico")
-    private List<MecanicoDTO> mecanicos;
+    private List<OrcamentoMaterialDTO> materiais;
 
     @Data
     public static class ClienteDTO {
-        @NotNull(message = "ID do cliente é obrigatório")
         private Long id;
     }
 
     @Data
-    public static class MecanicoDTO {
-        @NotNull(message = "Mecânico é obrigatório")
-        @Valid
-        private ClienteDTO mecanico;
-    }
-
-    @Data
-    public static class OrdemServicoItemDTO {
-        @NotNull(message = "ID do serviço é obrigatório")
+    public static class OrcamentoItemDTO {
+        // Se null, significa que é um serviço novo criado na hora
         private Long itemServicoId;
+
+        // Se itemServicoId for null, descricaoServico é obrigatória para criar o serviço no catálogo
+        @Size(max = 255, message = "Descrição do serviço muito longa")
+        private String descricaoServico;
 
         @NotNull(message = "Preço cobrado é obrigatório")
         @DecimalMin(value = "0.0", message = "Preço cobrado não pode ser negativo")
@@ -64,7 +55,7 @@ public class OrdemServicoDTO {
     }
 
     @Data
-    public static class OrdemServicoMaterialDTO {
+    public static class OrcamentoMaterialDTO {
         private Long materialId;
         private String nomeMaterial;
 

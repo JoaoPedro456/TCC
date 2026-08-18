@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../services/api';
-import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
 import { AutocompleteSelect } from '../components/AutocompleteSelect.jsx';
 
@@ -16,14 +16,25 @@ export function OrdemServicoPage() {
   const [funcionarios, setFuncionarios] = useState([]);
   const [servicos, setServicos] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState('TODOS');
   const [busca, setBusca] = useState('');
+  
   const [buscaServico, setBuscaServico] = useState('');
   const [paginaServicos, setPaginaServicos] = useState(1);
   const servicosPorPagina = 8;
   const [filtroCatalogo, setFiltroCatalogo] = useState('TODOS');
+  
+  const [materiaisCat, setMateriaisCat] = useState([]);
+  const [buscaMaterial, setBuscaMaterial] = useState('');
+  const [paginaMateriais, setPaginaMateriais] = useState(1);
+  const materiaisPorPagina = 8;
+  const [filtroCatMaterial, setFiltroCatMaterial] = useState('TODOS');
+  const [novoMaterialDescricao, setNovoMaterialDescricao] = useState('');
+  const [novoMaterialPreco, setNovoMaterialPreco] = useState('');
+  const [novoMaterialQtd, setNovoMaterialQtd] = useState('1');
   const [paginaOS, setPaginaOS] = useState(0);
   const [totalPaginasOS, setTotalPaginasOS] = useState(1);
   const [totalElementos, setTotalElementos] = useState(0);
@@ -43,6 +54,7 @@ export function OrdemServicoPage() {
     valorServico: '', // Preço cobrado pela mão de obra/peças
     valorTotal: 0,    // Calculado automaticamente
     itensServico: [],
+    materiais: [],
     mecanicos: [],
   };
   const [form, setForm] = useState(formInicial);
@@ -50,11 +62,61 @@ export function OrdemServicoPage() {
   const fecharModal = () => {
     setModalAberto(false);
     setForm(formInicial);
+    setEditId(null);
     setBuscaServico('');
     setPaginaServicos(1);
     setFiltroCatalogo('TODOS');
     setBuscaMecanico('');
     setPaginaMecanicos(1);
+
+    setBuscaMaterial('');
+    setPaginaMateriais(1);
+    setFiltroCatMaterial('TODOS');
+    setNovoMaterialDescricao('');
+    setNovoMaterialPreco('');
+    setNovoMaterialQtd('1');
+  };
+
+  const abrirEditar = async (os) => {
+    setEditId(os.id);
+    try {
+      const res = await api.get(`/ordens/${os.id}`);
+      const osCompleta = res.data;
+      
+      const valorServicos = osCompleta.itensServico?.reduce((acc, item) => acc + (item.precoCobrado || 0), 0) || 0;
+      
+      setForm({
+        clienteId: osCompleta.cliente?.id || '',
+        dataRealizacao: osCompleta.dataRealizacao || '',
+        observacao: osCompleta.observacao || '',
+        veiculo: osCompleta.veiculo || '',
+        quilometragem: osCompleta.quilometragem || '',
+        valorKm: osCompleta.valorKm || '',
+        valorServico: valorServicos.toFixed(2),
+        valorTotal: osCompleta.valorTotal || 0,
+        itensServico: osCompleta.itensServico?.map(item => ({
+          id: item.itemServico?.id,
+          nomeServico: item.itemServico?.nomeServico,
+          precoTabela: item.itemServico?.precoTabela,
+          precoCobrado: item.precoCobrado
+        })) || [],
+        materiais: osCompleta.materiais?.map(m => ({
+          id: m.material?.id,
+          nomeMaterial: m.material?.nomeMaterial || m.nomeMaterial,
+          precoUnitario: m.precoUnitario,
+          quantidade: m.quantidade,
+          precoTotal: m.precoTotal
+        })) || [],
+        mecanicos: osCompleta.mecanicos?.map(m => ({
+          mecanicoId: m.mecanico?.id,
+          nome: m.mecanico?.nome,
+          cargo: m.mecanico?.cargo
+        })) || []
+      });
+      setModalAberto(true);
+    } catch (err) {
+      error('Erro ao carregar dados da OS para edição.');
+    }
   };
 
   // Fetch functions para os seletores (serão chamadas pelo Autocomplete ou useEffects)
@@ -107,6 +169,21 @@ export function OrdemServicoPage() {
     return () => clearTimeout(timer);
   }, [modalAberto, buscaMecanico, paginaMecanicos]);
 
+  useEffect(() => {
+    if (!modalAberto) return;
+    const loadMateriais = async () => {
+      try {
+        const res = await api.get('/materiais', { 
+          params: { busca: buscaMaterial, size: 500 } 
+        });
+        setMateriaisCat(res.data.content || res.data || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadMateriais();
+  }, [modalAberto]);
+
 
   // 2. Carregar Ordens de Serviço paginadas e filtradas
   const carregarOrdens = useCallback(async () => {
@@ -150,9 +227,10 @@ export function OrdemServicoPage() {
       const servico = parseFloat(newState.valorServico) || 0;
       const km = parseFloat(newState.quilometragem) || 0;
       const precoKm = parseFloat(newState.valorKm) || 0;
+      const vMateriais = newState.materiais?.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0) || 0;
       
-      // O Total é a soma do Serviço + Custo da Viagem
-      newState.valorTotal = (servico + (km * precoKm)).toFixed(2);
+      // O Total é a soma do Serviço + Custo da Viagem + Materiais
+      newState.valorTotal = (servico + vMateriais + (km * precoKm)).toFixed(2);
       return newState;
     });
   };
@@ -186,7 +264,8 @@ export function OrdemServicoPage() {
       // Recalcula o total com a nova soma do catálogo
       const km = parseFloat(prev.quilometragem) || 0;
       const precoKm = parseFloat(prev.valorKm) || 0;
-      const totalRecalculado = (novoValorCat + (km * precoKm)).toFixed(2);
+      const vMateriais = prev.materiais.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0);
+      const totalRecalculado = (novoValorCat + vMateriais + (km * precoKm)).toFixed(2);
 
       return { 
         ...prev, 
@@ -225,6 +304,125 @@ export function OrdemServicoPage() {
     });
   };
 
+  const adicionarMaterialCatalogo = (item) => {
+    setForm(prev => {
+      if (prev.materiais.some(i => i.id === item.id)) {
+        error('Material já adicionado.');
+        return prev;
+      }
+      const novos = [...prev.materiais, { 
+        id: item.id, 
+        nomeMaterial: item.nomeMaterial, 
+        precoUnitario: item.precoTabela, 
+        quantidade: 1,
+        precoTotal: item.precoTabela 
+      }];
+      
+      const vMateriais = novos.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0);
+      const servico = parseFloat(prev.valorServico) || 0;
+      const km = parseFloat(prev.quilometragem) || 0;
+      const precoKm = parseFloat(prev.valorKm) || 0;
+      const totalRecalculado = (servico + vMateriais + (km * precoKm)).toFixed(2);
+
+      return {
+        ...prev,
+        materiais: novos,
+        valorTotal: totalRecalculado
+      };
+    });
+  };
+
+  const adicionarMaterialNovo = () => {
+    if (!novoMaterialDescricao.trim()) {
+      error('Informe a descrição do material.');
+      return;
+    }
+    const preco = Number(novoMaterialPreco);
+    if (isNaN(preco) || preco < 0) {
+      error('Informe um preço válido.');
+      return;
+    }
+    const qtd = Number(novoMaterialQtd);
+    if (isNaN(qtd) || qtd <= 0) {
+      error('Informe uma quantidade válida.');
+      return;
+    }
+    setForm(prev => {
+      const novos = [...prev.materiais, { 
+        id: null, 
+        nomeMaterial: novoMaterialDescricao, 
+        precoUnitario: preco,
+        quantidade: qtd,
+        precoTotal: preco * qtd
+      }];
+      
+      const vMateriais = novos.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0);
+      const servico = parseFloat(prev.valorServico) || 0;
+      const km = parseFloat(prev.quilometragem) || 0;
+      const precoKm = parseFloat(prev.valorKm) || 0;
+      const totalRecalculado = (servico + vMateriais + (km * precoKm)).toFixed(2);
+
+      return {
+        ...prev,
+        materiais: novos,
+        valorTotal: totalRecalculado
+      };
+    });
+    setNovoMaterialDescricao('');
+    setNovoMaterialPreco('');
+    setNovoMaterialQtd('1');
+    success('Material customizado adicionado!');
+  };
+
+  const removerMaterial = (index) => {
+    setForm(prev => {
+      const novos = [...prev.materiais];
+      novos.splice(index, 1);
+      
+      const vMateriais = novos.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0);
+      const servico = parseFloat(prev.valorServico) || 0;
+      const km = parseFloat(prev.quilometragem) || 0;
+      const precoKm = parseFloat(prev.valorKm) || 0;
+      const totalRecalculado = (servico + vMateriais + (km * precoKm)).toFixed(2);
+
+      return { ...prev, materiais: novos, valorTotal: totalRecalculado };
+    });
+  };
+
+  const atualizarQtdMaterial = (index, novaQtd) => {
+    const qtd = Number(novaQtd) || 0;
+    setForm(prev => {
+      const novos = [...prev.materiais];
+      novos[index].quantidade = qtd;
+      novos[index].precoTotal = novos[index].precoUnitario * qtd;
+      
+      const vMateriais = novos.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0);
+      const servico = parseFloat(prev.valorServico) || 0;
+      const km = parseFloat(prev.quilometragem) || 0;
+      const precoKm = parseFloat(prev.valorKm) || 0;
+      const totalRecalculado = (servico + vMateriais + (km * precoKm)).toFixed(2);
+
+      return { ...prev, materiais: novos, valorTotal: totalRecalculado };
+    });
+  };
+
+  const atualizarPrecoMaterial = (index, novoPreco) => {
+    const p = Number(novoPreco) || 0;
+    setForm(prev => {
+      const novos = [...prev.materiais];
+      novos[index].precoUnitario = p;
+      novos[index].precoTotal = p * novos[index].quantidade;
+      
+      const vMateriais = novos.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0);
+      const servico = parseFloat(prev.valorServico) || 0;
+      const km = parseFloat(prev.quilometragem) || 0;
+      const precoKm = parseFloat(prev.valorKm) || 0;
+      const totalRecalculado = (servico + vMateriais + (km * precoKm)).toFixed(2);
+
+      return { ...prev, materiais: novos, valorTotal: totalRecalculado };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.clienteId) {
@@ -250,12 +448,23 @@ export function OrdemServicoPage() {
           itemServicoId: Number(item.id),
           precoCobrado: Number(item.precoCobrado || 0)
         })),
+        materiais: form.materiais.map(item => ({
+          materialId: item.id ? Number(item.id) : null,
+          nomeMaterial: item.id ? null : item.nomeMaterial,
+          precoUnitario: Number(item.precoUnitario || 0),
+          quantidade: Number(item.quantidade || 0),
+          precoTotal: Number(item.precoTotal || 0)
+        })),
         mecanicos: form.mecanicos.map(m => ({ mecanico: { id: m.mecanicoId } })),
       };
-      await api.post('/ordens', payload);
+      if (editId) {
+        await api.put(`/ordens/${editId}`, payload);
+      } else {
+        await api.post('/ordens', payload);
+      }
       fecharModal();
       await carregarOrdens();
-      success('Ordem de Serviço criada com sucesso!');
+      success(editId ? 'Ordem de Serviço atualizada com sucesso!' : 'Ordem de Serviço criada com sucesso!');
     } catch (err) {
       // console.error('Erro ao salvar OS', err);
       const msg = err.response?.data?.erro || 'Erro ao salvar a OS.';
@@ -394,6 +603,9 @@ export function OrdemServicoPage() {
                     <button type="button" onClick={() => baixarPdf(os.id)} className="text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1.5 transition" title="Baixar PDF">
                       <Printer size={14} />
                     </button>
+                    <button type="button" onClick={() => abrirEditar(os)} className="text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-md p-1.5 transition" title="Editar OS">
+                      <Edit2 size={14} />
+                    </button>
                     <button type="button" onClick={() => excluir(os.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition">
                       <Trash2 size={14} />
                     </button>
@@ -436,7 +648,7 @@ export function OrdemServicoPage() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-[70%] max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
               <div>
-                <h3 className="text-[30px] font-bold text-slate-900">Nova Ordem de Serviço</h3>
+                <h3 className="text-[30px] font-bold text-slate-900">{editId ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}</h3>
                 <p className="text-[14px] text-slate-400 mt-0.5">Preencha os dados do atendimento</p>
               </div>
               <button onClick={fecharModal} className="text-slate-300 hover:text-slate-500 transition">
@@ -621,10 +833,118 @@ export function OrdemServicoPage() {
                 </div>
               )}
 
+              {/* Materiais */}
+              <div className="space-y-3 pt-6 border-t border-slate-100">
+                <label className="text-[14px] font-semibold text-slate-700 block mb-1">
+                  Materiais Aplicados <span className="text-slate-400 font-normal">(opcional)</span>
+                </label>
+                
+                <div className="flex p-1 bg-slate-200/50 rounded-lg mb-4">
+                  <button type="button" onClick={() => setFiltroCatMaterial('TODOS')} className={`flex-1 py-1.5 text-sm font-bold rounded-md transition ${filtroCatMaterial === 'TODOS' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Do Catálogo</button>
+                  <button type="button" onClick={() => setFiltroCatMaterial('NOVO')} className={`flex-1 py-1.5 text-sm font-bold rounded-md transition ${filtroCatMaterial === 'NOVO' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Material Avulso</button>
+                </div>
+
+                {filtroCatMaterial === 'TODOS' ? (
+                  <div className="mb-6 space-y-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                      <input type="text" placeholder="Buscar material..." value={buscaMaterial} onChange={e => { setBuscaMaterial(e.target.value); setPaginaMateriais(1); }} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-400" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                      {materiaisCat
+                        .filter(m => (m.nomeMaterial || '').toLowerCase().includes(buscaMaterial.toLowerCase()))
+                        .slice((paginaMateriais - 1) * materiaisPorPagina, paginaMateriais * materiaisPorPagina)
+                        .map(m => (
+                        <div key={m.id} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-900 flex items-center gap-1 truncate">
+                              <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded text-[9px] uppercase tracking-wider">{m.unidadeMedida}</span>
+                              {m.nomeMaterial}
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium mt-0.5">R$ {Number(m.precoTabela).toFixed(2)}</p>
+                          </div>
+                          <button type="button" onClick={() => adicionarMaterialCatalogo(m)} className="p-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition">
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    {Math.ceil(materiaisCat.filter(m => (m.nomeMaterial || '').toLowerCase().includes(buscaMaterial.toLowerCase())).length / materiaisPorPagina) > 1 && (
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200">
+                        <button type="button" onClick={() => setPaginaMateriais(p => Math.max(p - 1, 1))} disabled={paginaMateriais === 1} className="p-1.5 rounded bg-white border border-slate-200 text-slate-600 disabled:opacity-50"><ChevronLeft size={14} /></button>
+                        <span className="text-xs font-semibold text-slate-500">{paginaMateriais}</span>
+                        <button type="button" onClick={() => setPaginaMateriais(p => p + 1)} disabled={paginaMateriais === Math.ceil(materiaisCat.filter(m => (m.nomeMaterial || '').toLowerCase().includes(buscaMaterial.toLowerCase())).length / materiaisPorPagina)} className="p-1.5 rounded bg-white border border-slate-200 text-slate-600 disabled:opacity-50"><ChevronRight size={14} /></button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Descrição</label>
+                      <input type="text" value={novoMaterialDescricao} onChange={e => setNovoMaterialDescricao(e.target.value)} placeholder="Ex: Óleo 5W40..." className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-400" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Qtd</label>
+                        <input type="number" step="0.01" min="0.01" value={novoMaterialQtd} onChange={e => setNovoMaterialQtd(e.target.value)} placeholder="1" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-400" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Preço (R$)</label>
+                        <input type="number" step="0.01" min="0" value={novoMaterialPreco} onChange={e => setNovoMaterialPreco(e.target.value)} placeholder="0.00" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-400" />
+                      </div>
+                    </div>
+                    <button type="button" onClick={adicionarMaterialNovo} className="w-full py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 transition">Adicionar Material</button>
+                  </div>
+                )}
+
+                {/* Materiais Adicionados */}
+                {form.materiais.length > 0 && (
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3 mt-4">
+                    <h4 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2 flex justify-between items-center">
+                      <span>Materiais na OS ({form.materiais.length})</span>
+                    </h4>
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                      {form.materiais.map((item, index) => (
+                        <div key={index} className="flex flex-col xl:flex-row xl:items-center justify-between bg-white p-3 rounded-lg border border-slate-200 gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-800 truncate">{item.nomeMaterial}</p>
+                            {item.id && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Catálogo</p>}
+                            {!item.id && <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mt-0.5">Avulso</p>}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            <div className="relative w-20">
+                              <label className="text-[10px] font-bold text-slate-500 absolute -top-4 left-1">Qtd</label>
+                              <input
+                                type="number" step="0.01" min="0" value={item.quantidade} onChange={e => atualizarQtdMaterial(index, e.target.value)}
+                                className="w-full border border-slate-200 px-2 py-1.5 rounded-lg text-sm outline-none focus:border-slate-900 transition mt-2"
+                              />
+                            </div>
+                            <div className="relative w-24">
+                              <label className="text-[10px] font-bold text-slate-500 absolute -top-4 left-1">Preço Un.</label>
+                              <span className="absolute left-2 top-[55%] -translate-y-1/2 text-slate-400 text-xs font-semibold">R$</span>
+                              <input
+                                type="number" step="0.01" min="0" value={item.precoUnitario} onChange={e => atualizarPrecoMaterial(index, e.target.value)}
+                                className="w-full border border-slate-200 pl-7 pr-2 py-1.5 rounded-lg text-sm outline-none focus:border-slate-900 transition mt-2"
+                              />
+                            </div>
+                            <div className="w-20 pt-2 text-right">
+                              <span className="block text-sm font-black text-slate-900">R$ {Number(item.precoTotal).toFixed(2)}</span>
+                            </div>
+                            <button type="button" onClick={() => removerMaterial(index)} className="text-slate-300 hover:text-red-500 p-1.5 transition mt-2 ml-1" title="Remover material">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* --- NOVA ÁREA FINANCEIRA --- */}
-              <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+              <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl mt-6">
                 <h4 className="text-sm font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">Detalhes Financeiros</h4>
-                <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-4 gap-4 mb-4">
                   
                   {/* Bloco Valor do Serviço */}
                   <div>
@@ -637,6 +957,20 @@ export function OrdemServicoPage() {
                         value={form.valorServico}
                         onChange={e => atualizarCampoMagico('valorServico', e.target.value)}
                         disabled={form.itensServico.length > 0}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bloco Valor dos Materiais */}
+                  <div>
+                    <label className="text-[12px] font-semibold text-slate-700 block mb-1">Valor dos Materiais</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
+                      <input
+                        type="text"
+                        className="w-full border border-slate-200 pl-9 pr-3 py-2 rounded-lg text-sm outline-none bg-slate-100 text-slate-400 cursor-not-allowed"
+                        value={form.materiais.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0).toFixed(2)}
+                        disabled
                       />
                     </div>
                   </div>
@@ -674,7 +1008,7 @@ export function OrdemServicoPage() {
                 <div className="bg-slate-900 p-4 rounded-lg flex justify-between items-center">
                   <div>
                     <p className="text-white text-sm font-semibold uppercase tracking-wider">Total a Pagar</p>
-                    <p className="text-slate-400 text-xs mt-0.5">Serviços + (Distância x Custo KM)</p>
+                    <p className="text-slate-400 text-xs mt-0.5">Serviços + Materiais + (Distância x Custo KM)</p>
                   </div>
                   <p className="text-3xl font-black text-white">
                     R$ {Number(form.valorTotal || 0).toFixed(2)}
@@ -761,7 +1095,7 @@ export function OrdemServicoPage() {
                   Cancelar
                 </button>
                 <button type="submit" disabled={submitting} className="flex-1 px-4 py-3 bg-slate-900 text-white font-semibold rounded-lg hover:bg-slate-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
-                  {submitting ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : 'Criar OS'}
+                  {submitting ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : (editId ? 'Salvar Alterações' : 'Criar OS')}
                 </button>
               </div>
             </form>

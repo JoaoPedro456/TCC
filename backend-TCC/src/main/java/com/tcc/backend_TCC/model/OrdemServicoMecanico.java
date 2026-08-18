@@ -14,6 +14,7 @@ public class OrdemServicoMecanico {
 
     @ManyToOne
     @JoinColumn(name = "ordem_servico_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private OrdemServico ordemServico;
 
     @ManyToOne

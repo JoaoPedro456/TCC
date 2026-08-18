@@ -64,6 +64,297 @@ public class ImpressaoService {
         return baos.toByteArray();
     }
 
+    @Autowired
+    private com.tcc.backend_TCC.repository.OrcamentoRepository orcamentoRepository;
+
+    @Transactional(readOnly = true)
+    public byte[] gerarPdfOrcamento(Long orcamentoId) throws Exception {
+        com.tcc.backend_TCC.model.Orcamento orc = orcamentoRepository.findById(orcamentoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Orçamento não encontrado"));
+
+        Document document = new Document(PageSize.A4, 20, 20, 20, 20);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = PdfWriter.getInstance(document, baos);
+
+        document.open();
+
+        buildOrcamentoPdfContent(document, writer, orc);
+
+        document.close();
+        return baos.toByteArray();
+    }
+
+    private void buildOrcamentoPdfContent(Document document, PdfWriter writer, com.tcc.backend_TCC.model.Orcamento orc) throws Exception {
+        // CABEÇALHO
+        PdfPTable headerTable = new PdfPTable(2);
+        headerTable.setWidthPercentage(100);
+        headerTable.setWidths(new float[]{50, 50});
+
+        PdfPCell leftHeader = new PdfPCell();
+        leftHeader.setBorder(Rectangle.BOTTOM);
+        leftHeader.setBorderColor(CINZA_ESCURO);
+        leftHeader.setPaddingBottom(5f);
+
+        java.net.URL logoUrl = getClass().getResource("/static/logo-bazani.png");
+        com.lowagie.text.Image logoImg = null;
+        if (logoUrl != null) {
+            try {
+                logoImg = com.lowagie.text.Image.getInstance(logoUrl);
+                logoImg.scaleToFit(50f, 50f);
+            } catch (Exception e) {}
+        }
+
+        if (logoImg != null) {
+            PdfPTable logoTextTable = new PdfPTable(2);
+            logoTextTable.setWidthPercentage(100);
+            logoTextTable.setWidths(new float[]{20, 80});
+
+            PdfPCell cLogo = new PdfPCell(logoImg);
+            cLogo.setBorder(Rectangle.NO_BORDER);
+            cLogo.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            cLogo.setPadding(0f);
+            logoTextTable.addCell(cLogo);
+
+            PdfPCell cText = new PdfPCell();
+            cText.setBorder(Rectangle.NO_BORDER);
+            cText.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            cText.setPadding(0f);
+            cText.setPaddingLeft(5f);
+            cText.addElement(new Paragraph("BAZANI MECÂNICA", new Font(Font.HELVETICA, 14, Font.BOLD, PRETO)));
+            cText.addElement(new Paragraph("Orçamento de Serviços", new Font(Font.HELVETICA, 8, Font.NORMAL, CINZA_ESCURO)));
+            logoTextTable.addCell(cText);
+
+            leftHeader.addElement(logoTextTable);
+        } else {
+            leftHeader.addElement(new Paragraph("BAZANI MECÂNICA", new Font(Font.HELVETICA, 14, Font.BOLD, PRETO)));
+            leftHeader.addElement(new Paragraph("Orçamento de Serviços", new Font(Font.HELVETICA, 8, Font.NORMAL, CINZA_ESCURO)));
+        }
+
+        PdfPCell rightHeader = new PdfPCell();
+        rightHeader.setBorder(Rectangle.BOTTOM);
+        rightHeader.setBorderColor(CINZA_ESCURO);
+        rightHeader.setPaddingBottom(5f);
+
+        Paragraph orcNum = new Paragraph("ORÇAMENTO #" + orc.getId(), new Font(Font.HELVETICA, 12, Font.BOLD, PRETO));
+        orcNum.setAlignment(Element.ALIGN_RIGHT);
+        rightHeader.addElement(orcNum);
+
+        String dataEmissao = orc.getDataRegisto() != null ? orc.getDataRegisto().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+        String status = safe(orc.getStatus() != null ? orc.getStatus() : "Pendente");
+        
+        Paragraph subHeaderInfo = new Paragraph("Status: " + status + " | Emissão: " + dataEmissao, F_LABEL);
+        subHeaderInfo.setAlignment(Element.ALIGN_RIGHT);
+        rightHeader.addElement(subHeaderInfo);
+
+        headerTable.addCell(leftHeader);
+        headerTable.addCell(rightHeader);
+        document.add(headerTable);
+        document.add(spacer(5f));
+
+        // DADOS DO CLIENTE
+        document.add(buildSectionHeader("Dados do Cliente"));
+
+        PdfPTable tCliente = new PdfPTable(4);
+        tCliente.setWidthPercentage(100);
+        tCliente.setWidths(new float[]{15, 35, 15, 35});
+
+        addInfoRow(tCliente, "Cliente:", safe(orc.getCliente() != null ? orc.getCliente().getNome() : null),
+                "CPF:",     safe(orc.getCliente() != null ? orc.getCliente().getCpf() : null));
+        addInfoRow(tCliente, "Telefone:", safe(orc.getCliente() != null ? orc.getCliente().getTelefone() : null),
+                "Endereço:", safe(orc.getCliente() != null ? orc.getCliente().getLogradouro() : null));
+
+        document.add(tCliente);
+        document.add(spacer(5f));
+
+        // INFORMAÇÕES DO SERVIÇO E VEÍCULO
+        document.add(buildSectionHeader("Informações do Orçamento"));
+
+        PdfPTable tServico = new PdfPTable(2);
+        tServico.setWidthPercentage(100);
+        tServico.setWidths(new float[]{75, 25});
+
+        PdfPCell cDescLeft = new PdfPCell();
+        cDescLeft.setPadding(6f);
+        cDescLeft.setBorderColor(CINZA_CLARO);
+        cDescLeft.setBorderWidth(1f);
+
+        Paragraph lblDesc = new Paragraph("Diagnóstico/Observações:", F_LABEL);
+        lblDesc.setSpacingAfter(2f);
+        cDescLeft.addElement(lblDesc);
+
+        Paragraph obsP = new Paragraph(safe(orc.getObservacao()), F_NORMAL);
+        cDescLeft.addElement(obsP);
+
+        PdfPCell cVeicRight = new PdfPCell();
+        cVeicRight.setPadding(6f);
+        cVeicRight.setBorderColor(CINZA_CLARO);
+        cVeicRight.setBorderWidth(1f);
+
+        String veicTexto = (orc.getVeiculo() != null) ? orc.getVeiculo() : "Não informado";
+        Paragraph pVeiculo = new Paragraph();
+        pVeiculo.add(new Chunk("Veículo/Máquina: ", F_LABEL));
+        pVeiculo.add(new Chunk(veicTexto, F_NORMAL));
+        pVeiculo.setSpacingAfter(8f);
+        cVeicRight.addElement(pVeiculo);
+
+        String kmInfo = "Sem viagem";
+        if (orc.getQuilometragem() != null && orc.getQuilometragem() > 0) {
+            kmInfo = String.format("%.1f", orc.getQuilometragem()).replace(".", ",") + " km";
+        }
+        Paragraph pKm = new Paragraph();
+        pKm.add(new Chunk("Deslocação: ", F_LABEL));
+        pKm.add(new Chunk(kmInfo, F_NORMAL));
+        cVeicRight.addElement(pKm);
+
+        tServico.addCell(cDescLeft);
+        tServico.addCell(cVeicRight);
+
+        document.add(tServico);
+        document.add(spacer(5f));
+
+        // DETALHAMENTO DE VALORES
+        BigDecimal totalGeral = orc.getValorTotal() != null ? orc.getValorTotal() : BigDecimal.ZERO;
+        BigDecimal desconto = orc.getValorDesconto() != null ? orc.getValorDesconto() : BigDecimal.ZERO;
+        BigDecimal qtdKm = orc.getQuilometragem() != null ? BigDecimal.valueOf(orc.getQuilometragem()) : BigDecimal.ZERO;
+        BigDecimal precoKm = orc.getValorKm() != null ? orc.getValorKm() : BigDecimal.ZERO;
+        BigDecimal custoKm = qtdKm.multiply(precoKm).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal subtotal = totalGeral.add(desconto);
+
+        BigDecimal valorTotalMateriais = BigDecimal.ZERO;
+        boolean temMateriais = orc.getMateriais() != null && !orc.getMateriais().isEmpty();
+        if (temMateriais) {
+            for (var m : orc.getMateriais()) {
+                valorTotalMateriais = valorTotalMateriais.add(m.getPrecoTotal() != null ? m.getPrecoTotal() : BigDecimal.ZERO);
+            }
+        }
+
+        BigDecimal valorServicos = subtotal.subtract(custoKm).subtract(valorTotalMateriais);
+        if (valorServicos.compareTo(BigDecimal.ZERO) < 0) valorServicos = BigDecimal.ZERO;
+
+        boolean temServicos = orc.getItensServico() != null && !orc.getItensServico().isEmpty();
+        boolean temCustoKm = custoKm.compareTo(BigDecimal.ZERO) > 0;
+
+        if (temServicos || temCustoKm || temMateriais) {
+            document.add(buildSectionHeader("Detalhamento de Valores"));
+
+            PdfPTable tSvc = new PdfPTable(2);
+            tSvc.setWidthPercentage(100);
+            tSvc.setWidths(new float[]{80, 20});
+
+            tSvc.addCell(buildTableHeader("Descrição"));
+            tSvc.addCell(buildTableHeader("Valor (R$)"));
+
+            if (temServicos) {
+                for (var item : orc.getItensServico()) {
+                    tSvc.addCell(styledCell(safe(item.getItemServico() != null ? item.getItemServico().getNomeServico() : "Serviço"), Element.ALIGN_LEFT));
+                    tSvc.addCell(styledCell("R$ " + String.format("%.2f", item.getPrecoCobrado() != null ? item.getPrecoCobrado() : BigDecimal.ZERO).replace(".", ","), Element.ALIGN_RIGHT));
+                }
+            }
+
+            if (temMateriais) {
+                for (var m : orc.getMateriais()) {
+                    String nome = m.getMaterial() != null ? m.getMaterial().getNomeMaterial() : m.getNomeMaterial();
+                    String qtdInfo = String.format("%.2f", m.getQuantidade() != null ? m.getQuantidade() : BigDecimal.ZERO).replace(".", ",");
+                    String unidade = m.getMaterial() != null && m.getMaterial().getUnidadeMedida() != null ? m.getMaterial().getUnidadeMedida().name() : "";
+                    String texto = nome + " (" + qtdInfo + " " + unidade + ")";
+                    tSvc.addCell(styledCell(safe(texto), Element.ALIGN_LEFT));
+                    tSvc.addCell(styledCell("R$ " + String.format("%.2f", m.getPrecoTotal() != null ? m.getPrecoTotal() : BigDecimal.ZERO).replace(".", ","), Element.ALIGN_RIGHT));
+                }
+            }
+
+            if (temCustoKm) {
+                String lblCustoKm = "Deslocação (" + String.format("%.1f", orc.getQuilometragem()).replace(".", ",") + " km)";
+                tSvc.addCell(styledCell(lblCustoKm, Element.ALIGN_LEFT));
+                tSvc.addCell(styledCell("R$ " + String.format("%.2f", custoKm).replace(".", ","), Element.ALIGN_RIGHT));
+            }
+
+            document.add(tSvc);
+            document.add(spacer(5f));
+        }
+
+        // VALOR TOTAL E ASSINATURA
+        PdfPTable tBottom = new PdfPTable(2);
+        tBottom.setWidthPercentage(100);
+        tBottom.setWidths(new float[]{45, 55});
+        tBottom.setSpacingBefore(5f);
+
+        PdfPCell summaryCell = new PdfPCell();
+        summaryCell.setBorder(Rectangle.NO_BORDER);
+        summaryCell.setPadding(0f);
+
+        PdfPTable resumo = new PdfPTable(2);
+        resumo.setWidthPercentage(100);
+        resumo.setWidths(new float[]{60, 40});
+
+        addResumoLinhaOS(resumo, "Total dos Serviços:", valorServicos);
+        if (temMateriais) {
+            addResumoLinhaOS(resumo, "Total Materiais:", valorTotalMateriais);
+        }
+        if (temCustoKm) {
+            addResumoLinhaOS(resumo, "Deslocação:", custoKm);
+        }
+        if (desconto.compareTo(BigDecimal.ZERO) > 0) {
+            addResumoLinhaOS(resumo, "Desconto:", desconto.negate());
+        }
+
+        PdfPCell lblTotal = new PdfPCell(new Paragraph("TOTAL ORÇADO:", new Font(Font.HELVETICA, 9, Font.BOLD, PRETO)));
+        lblTotal.setBorder(Rectangle.TOP);
+        lblTotal.setBorderColor(PRETO);
+        lblTotal.setBorderWidth(1.0f);
+        lblTotal.setPadding(4f);
+        lblTotal.setPaddingLeft(0f);
+        resumo.addCell(lblTotal);
+
+        PdfPCell valTotal = new PdfPCell(new Paragraph("R$ " + String.format("%.2f", totalGeral).replace(".", ","), new Font(Font.HELVETICA, 10, Font.BOLD, PRETO)));
+        valTotal.setBorder(Rectangle.TOP);
+        valTotal.setBorderColor(PRETO);
+        valTotal.setBorderWidth(1.0f);
+        valTotal.setPadding(4f);
+        valTotal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        resumo.addCell(valTotal);
+
+        summaryCell.addElement(resumo);
+
+        PdfPCell sigCell = new PdfPCell();
+        sigCell.setBorder(Rectangle.NO_BORDER);
+        sigCell.setVerticalAlignment(Element.ALIGN_BOTTOM);
+        sigCell.setPadding(0f);
+        sigCell.setPaddingTop(15f);
+
+        Paragraph linhaAssinatura = new Paragraph("____________________________________________", F_NORMAL);
+        linhaAssinatura.setAlignment(Element.ALIGN_CENTER);
+        sigCell.addElement(linhaAssinatura);
+
+        Paragraph lblAssinatura = new Paragraph("Assinatura do Cliente (Aprovação)", F_LABEL);
+        lblAssinatura.setAlignment(Element.ALIGN_CENTER);
+        lblAssinatura.setSpacingBefore(2f);
+        sigCell.addElement(lblAssinatura);
+
+        tBottom.addCell(summaryCell);
+        tBottom.addCell(sigCell);
+        document.add(tBottom);
+
+        // RODAPÉ
+        document.add(spacer(10f));
+        Font fonteRodapePequena = new Font(F_SUBTITULO.getBaseFont(), 7f, F_SUBTITULO.getStyle(), F_SUBTITULO.getColor());
+        Paragraph rodape = new Paragraph("Documento gerado pelo Sistema Bazani Mecânica e Autopeças", fonteRodapePequena);
+        rodape.setAlignment(Element.ALIGN_CENTER);
+        try {
+            PdfGState estadoGraficoTransparente = new PdfGState();
+            estadoGraficoTransparente.setFillOpacity(0.5f);
+
+            PdfContentByte cb = writer.getDirectContent();
+            cb.saveState();
+            cb.setGState(estadoGraficoTransparente);
+
+            document.add(rodape);
+            cb.restoreState();
+        } catch (Exception e) {
+            document.add(rodape);
+        }
+    }
+
     private void buildOsPdfContent(Document document, PdfWriter writer, OrdemServico os) throws Exception {
 
         // CABEÇALHO
@@ -209,7 +500,15 @@ public class ImpressaoService {
         BigDecimal precoKm = os.getValorKm() != null ? os.getValorKm() : BigDecimal.ZERO;
         BigDecimal custoKm = qtdKm.multiply(precoKm).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal valorServicos = totalGeral.subtract(custoKm);
+        BigDecimal valorTotalMateriais = BigDecimal.ZERO;
+        boolean temMateriais = os.getMateriais() != null && !os.getMateriais().isEmpty();
+        if (temMateriais) {
+            for (var m : os.getMateriais()) {
+                valorTotalMateriais = valorTotalMateriais.add(m.getPrecoTotal() != null ? m.getPrecoTotal() : BigDecimal.ZERO);
+            }
+        }
+
+        BigDecimal valorServicos = totalGeral.subtract(custoKm).subtract(valorTotalMateriais);
         if (valorServicos.compareTo(BigDecimal.ZERO) < 0) {
             valorServicos = BigDecimal.ZERO;
         }
@@ -217,7 +516,7 @@ public class ImpressaoService {
         boolean temServicos = os.getItensServico() != null && !os.getItensServico().isEmpty();
         boolean temCustoKm = custoKm.compareTo(BigDecimal.ZERO) > 0;
 
-        if (temServicos || temCustoKm) {
+        if (temServicos || temCustoKm || temMateriais) {
             document.add(buildSectionHeader("Detalhamento de Valores"));
 
             PdfPTable tSvc = new PdfPTable(2);
@@ -231,6 +530,17 @@ public class ImpressaoService {
                 for (var item : os.getItensServico()) {
                     tSvc.addCell(styledCell(safe(item.getItemServico() != null ? item.getItemServico().getNomeServico() : "Serviço"), Element.ALIGN_LEFT));
                     tSvc.addCell(styledCell("R$ " + String.format("%.2f", item.getPrecoCobrado() != null ? item.getPrecoCobrado() : BigDecimal.ZERO).replace(".", ","), Element.ALIGN_RIGHT));
+                }
+            }
+
+            if (temMateriais) {
+                for (var m : os.getMateriais()) {
+                    String nome = m.getMaterial() != null ? m.getMaterial().getNomeMaterial() : m.getNomeMaterial();
+                    String qtdInfo = String.format("%.2f", m.getQuantidade() != null ? m.getQuantidade() : BigDecimal.ZERO).replace(".", ",");
+                    String unidade = m.getMaterial() != null && m.getMaterial().getUnidadeMedida() != null ? m.getMaterial().getUnidadeMedida().name() : "";
+                    String texto = nome + " (" + qtdInfo + " " + unidade + ")";
+                    tSvc.addCell(styledCell(safe(texto), Element.ALIGN_LEFT));
+                    tSvc.addCell(styledCell("R$ " + String.format("%.2f", m.getPrecoTotal() != null ? m.getPrecoTotal() : BigDecimal.ZERO).replace(".", ","), Element.ALIGN_RIGHT));
                 }
             }
 
@@ -259,6 +569,9 @@ public class ImpressaoService {
         resumo.setWidths(new float[]{60, 40});
 
         addResumoLinhaOS(resumo, "Total dos Serviços:", valorServicos);
+        if (temMateriais) {
+            addResumoLinhaOS(resumo, "Total Materiais:", valorTotalMateriais);
+        }
         if (temCustoKm) {
             addResumoLinhaOS(resumo, "Deslocação:", custoKm);
         }
