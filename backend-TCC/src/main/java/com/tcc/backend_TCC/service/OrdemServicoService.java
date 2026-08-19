@@ -73,6 +73,12 @@ public class OrdemServicoService {
                 BigDecimal preco = itemDto.getPrecoCobrado() != null ? itemDto.getPrecoCobrado() : BigDecimal.ZERO;
                 totalCalculado = totalCalculado.add(preco);
             }
+            if (dto.getMateriais() != null && !dto.getMateriais().isEmpty()) {
+                for (var mDto : dto.getMateriais()) {
+                    BigDecimal preco = mDto.getPrecoTotal() != null ? mDto.getPrecoTotal() : BigDecimal.ZERO;
+                    totalCalculado = totalCalculado.add(preco);
+                }
+            }
             BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
             BigDecimal custoKm = qtdKm.multiply(valorKm);
             totalCalculado = totalCalculado.add(custoKm);
@@ -80,7 +86,7 @@ public class OrdemServicoService {
             BigDecimal diferenca = valorTotal.subtract(totalCalculado).abs();
             if (diferenca.compareTo(new BigDecimal("0.02")) > 0) {
                 throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
-                        "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços e deslocamento (R$ " + totalCalculado + ").");
+                        "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços, materiais e deslocamento (R$ " + totalCalculado + ").");
             }
         }
 
@@ -178,30 +184,30 @@ public class OrdemServicoService {
         BigDecimal valorKm = dto.getValorKm() != null ? dto.getValorKm() : BigDecimal.ZERO;
         BigDecimal valorTotal = dto.getValorTotal() != null ? dto.getValorTotal() : BigDecimal.ZERO;
 
-        // --- Validação de consistência do valor total ---
-        BigDecimal totalCalculado = BigDecimal.ZERO;
+        // --- Validação de consistência do valor total apenas se houver itens no catálogo ---
         if (dto.getItensServico() != null && !dto.getItensServico().isEmpty()) {
+            BigDecimal totalCalculado = BigDecimal.ZERO;
             for (var itemDto : dto.getItensServico()) {
                 BigDecimal preco = itemDto.getPrecoCobrado() != null ? itemDto.getPrecoCobrado() : BigDecimal.ZERO;
                 totalCalculado = totalCalculado.add(preco);
             }
-        }
-        
-        if (dto.getMateriais() != null && !dto.getMateriais().isEmpty()) {
-            for (var mDto : dto.getMateriais()) {
-                BigDecimal preco = mDto.getPrecoTotal() != null ? mDto.getPrecoTotal() : BigDecimal.ZERO;
-                totalCalculado = totalCalculado.add(preco);
+            
+            if (dto.getMateriais() != null && !dto.getMateriais().isEmpty()) {
+                for (var mDto : dto.getMateriais()) {
+                    BigDecimal preco = mDto.getPrecoTotal() != null ? mDto.getPrecoTotal() : BigDecimal.ZERO;
+                    totalCalculado = totalCalculado.add(preco);
+                }
             }
-        }
-        
-        BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
-        BigDecimal custoKm = qtdKm.multiply(valorKm);
-        totalCalculado = totalCalculado.add(custoKm);
+            
+            BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
+            BigDecimal custoKm = qtdKm.multiply(valorKm);
+            totalCalculado = totalCalculado.add(custoKm);
 
-        BigDecimal diferenca = valorTotal.subtract(totalCalculado).abs();
-        if (diferenca.compareTo(new BigDecimal("0.02")) > 0) {
-            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
-                    "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços, materiais e deslocamento (R$ " + totalCalculado + ").");
+            BigDecimal diferenca = valorTotal.subtract(totalCalculado).abs();
+            if (diferenca.compareTo(new BigDecimal("0.02")) > 0) {
+                throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                        "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços, materiais e deslocamento (R$ " + totalCalculado + ").");
+            }
         }
 
         os.setValorKm(valorKm);
