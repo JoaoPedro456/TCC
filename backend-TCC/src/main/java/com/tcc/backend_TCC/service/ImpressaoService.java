@@ -158,8 +158,20 @@ public class ImpressaoService {
         tCliente.setWidthPercentage(100);
         tCliente.setWidths(new float[]{15, 35, 15, 35});
 
+        String docLabelOrc = "CPF/CNPJ:";
+        String docValorOrc = null;
+        if (orc.getCliente() != null) {
+            if (orc.getCliente().getCnpj() != null && !orc.getCliente().getCnpj().isBlank()) {
+                docLabelOrc = "CNPJ:";
+                docValorOrc = orc.getCliente().getCnpj();
+            } else {
+                docLabelOrc = "CPF:";
+                docValorOrc = orc.getCliente().getCpf();
+            }
+        }
+
         addInfoRow(tCliente, "Cliente:", safe(orc.getCliente() != null ? orc.getCliente().getNome() : null),
-                "CPF:",     safe(orc.getCliente() != null ? orc.getCliente().getCpf() : null));
+                docLabelOrc, safe(docValorOrc));
         addInfoRow(tCliente, "Telefone:", safe(orc.getCliente() != null ? orc.getCliente().getTelefone() : null),
                 "Endereço:", safe(orc.getCliente() != null ? orc.getCliente().getLogradouro() : null));
 
@@ -440,8 +452,20 @@ public class ImpressaoService {
         tCliente.setWidthPercentage(100);
         tCliente.setWidths(new float[]{15, 35, 15, 35});
 
+        String docLabelOs = "CPF/CNPJ:";
+        String docValorOs = null;
+        if (os.getCliente() != null) {
+            if (os.getCliente().getCnpj() != null && !os.getCliente().getCnpj().isBlank()) {
+                docLabelOs = "CNPJ:";
+                docValorOs = os.getCliente().getCnpj();
+            } else {
+                docLabelOs = "CPF:";
+                docValorOs = os.getCliente().getCpf();
+            }
+        }
+
         addInfoRow(tCliente, "Cliente:", safe(os.getCliente() != null ? os.getCliente().getNome() : null),
-                "CPF:",     safe(os.getCliente() != null ? os.getCliente().getCpf() : null));
+                docLabelOs, safe(docValorOs));
         addInfoRow(tCliente, "Telefone:", safe(os.getCliente() != null ? os.getCliente().getTelefone() : null),
                 "Endereço:", safe(os.getCliente() != null ? os.getCliente().getLogradouro() : null));
 
