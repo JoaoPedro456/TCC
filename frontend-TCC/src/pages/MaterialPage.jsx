@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatarMoeda } from '../utils/formatters';
 import api from '../services/api';
 import { Plus, Trash2, X, Search, PenIcon, PackageOpen } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
@@ -151,7 +152,7 @@ export function MaterialPage() {
               </div>
               <h3 className="font-semibold text-slate-900">{m.nomeMaterial}</h3>
               <p className="text-lg font-black text-slate-900 mt-1">
-                R$ {Number(m.precoTabela || 0).toFixed(2)}
+                R$ {formatarMoeda(m.precoTabela || 0)}
               </p>
             </div>
             

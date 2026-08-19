@@ -1,3 +1,4 @@
+import { formatarMoeda } from '../utils/formatters';
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Users, DollarSign, Printer, Search, TrendingUp } from 'lucide-react';
@@ -163,7 +164,7 @@ function CardResumo({ label, valor, icon, color = "text-slate-900", highlight = 
         <span className="text-xs font-bold text-slate-400 uppercase">{label}</span>
         {icon}
       </div>
-      <p className={`text-2xl font-black ${color}`}>R$ {Number(valor).toFixed(2)}</p>
+      <p className={`text-2xl font-black ${color}`}>R$ {formatarMoeda(valor)}</p>
     </div>
   );
 }

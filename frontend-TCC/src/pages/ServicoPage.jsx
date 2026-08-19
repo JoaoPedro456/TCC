@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatarMoeda } from '../utils/formatters';
 import api from '../services/api';
 import { Plus, Trash2, X, Search, PenIcon } from 'lucide-react'; // <-- PenIcon importado
 import { useToast } from '../components/ToastProvider.jsx';
@@ -144,7 +145,7 @@ export function ServicoPage() {
             <div>
               <h3 className="font-semibold text-slate-900">{s.nomeServico}</h3>
               <p className="text-lg font-black text-slate-900 mt-1">
-                R$ {Number(s.precoTabela || 0).toFixed(2)}
+                R$ {formatarMoeda(s.precoTabela || 0)}
               </p>
             </div>
             

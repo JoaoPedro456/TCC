@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { formatarMoeda } from '../utils/formatters';
 import api from '../services/api';
 import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
@@ -593,7 +594,7 @@ export function OrdemServicoPage() {
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-xl font-black text-slate-900">R$ {Number(os.valorTotal || 0).toFixed(2)}</p>
+                  <p className="text-xl font-black text-slate-900">R$ {formatarMoeda(os.valorTotal || 0)}</p>
                   <div className="flex items-center gap-1 mt-2 justify-end">
                     <select value={os.status || 'ABERTA'} onChange={e => atualizarStatus(os.id, e.target.value)} className="text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 cursor-pointer outline-none focus:border-slate-400">
                       <option value="ABERTA">Aberta</option>
@@ -760,7 +761,7 @@ export function OrdemServicoPage() {
                         className={`p-3 rounded-lg border text-left transition ${selecionado ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
                       >
                         <p className="font-medium text-sm">{s.nomeServico}</p>
-                        <p className="text-xs mt-0.5 text-slate-400">R$ {Number(s.precoTabela || 0).toFixed(2)}</p>
+                        <p className="text-xs mt-0.5 text-slate-400">R$ {formatarMoeda(s.precoTabela || 0)}</p>
                       </button>
                     );
                   })}
@@ -804,7 +805,7 @@ export function OrdemServicoPage() {
                       <div key={item.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 gap-4">
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-slate-800 truncate">{item.nomeServico}</p>
-                          <p className="text-xs text-slate-400">Preço tabela: R$ {Number(item.precoTabela || 0).toFixed(2)}</p>
+                          <p className="text-xs text-slate-400">Preço tabela: R$ {formatarMoeda(item.precoTabela || 0)}</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs text-slate-500 font-medium">Cobrado:</span>
@@ -861,7 +862,7 @@ export function OrdemServicoPage() {
                               <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded text-[9px] uppercase tracking-wider">{m.unidadeMedida}</span>
                               {m.nomeMaterial}
                             </p>
-                            <p className="text-xs text-slate-500 font-medium mt-0.5">R$ {Number(m.precoTabela).toFixed(2)}</p>
+                            <p className="text-xs text-slate-500 font-medium mt-0.5">R$ {formatarMoeda(m.precoTabela)}</p>
                           </div>
                           <button type="button" onClick={() => adicionarMaterialCatalogo(m)} className="p-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition">
                             <Plus size={16} />
@@ -928,7 +929,7 @@ export function OrdemServicoPage() {
                               />
                             </div>
                             <div className="w-20 pt-2 text-right">
-                              <span className="block text-sm font-black text-slate-900">R$ {Number(item.precoTotal).toFixed(2)}</span>
+                              <span className="block text-sm font-black text-slate-900">R$ {formatarMoeda(item.precoTotal)}</span>
                             </div>
                             <button type="button" onClick={() => removerMaterial(index)} className="text-slate-300 hover:text-red-500 p-1.5 transition mt-2 ml-1" title="Remover material">
                               <Trash2 size={14} />
@@ -1011,7 +1012,7 @@ export function OrdemServicoPage() {
                     <p className="text-slate-400 text-xs mt-0.5">Serviços + Materiais + (Distância x Custo KM)</p>
                   </div>
                   <p className="text-3xl font-black text-white">
-                    R$ {Number(form.valorTotal || 0).toFixed(2)}
+                    R$ {formatarMoeda(form.valorTotal || 0)}
                   </p>
                 </div>
               </div>

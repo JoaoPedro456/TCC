@@ -1,3 +1,4 @@
+import { formatarMoeda } from '../utils/formatters';
 import { useState, useEffect } from 'react';
 import { ArrowUpCircle, ArrowDownCircle, DollarSign, Plus, Clock, AlertCircle, Trash2, X, Search, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
 import api from '../services/api';
@@ -144,7 +145,7 @@ export function FaturamentoPage() {
     }
   };
 
-  const formatarMoeda = (valor) => `R$ ${Number(valor).toFixed(2).replace('.', ',')}`;
+  const formatarMoeda = (valor) => `R$ ${formatarMoeda(valor)}`;
   const formatarData = (dataString) => {
     if (!dataString) return '';
     const [ano, mes, dia] = dataString.split('-');

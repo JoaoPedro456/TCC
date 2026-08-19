@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatarMoeda } from '../utils/formatters';
 import api from '../services/api';
 import { Search, Calendar, DollarSign, ClipboardList, Users, Wrench, Download, ArrowUpRight, BarChart2, CheckCircle2, X } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
@@ -11,7 +12,7 @@ const CustomTooltip = ({ active, payload, label }) => {
       <div className="bg-slate-900 text-white p-3 rounded-lg shadow-xl border border-slate-800">
         <p className="text-sm font-semibold mb-1">{label || payload[0].name}</p>
         <p className="text-emerald-400 font-bold">
-          R$ {Number(payload[0].value).toFixed(2).replace('.', ',')}
+          R$ {formatarMoeda(payload[0].value)}
         </p>
       </div>
     );
@@ -184,7 +185,7 @@ export function RelatorioPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <KpiCard 
             title="Faturamento do Período" 
-            value={`R$ ${Number(faturamento.totalFaturado || 0).toFixed(2).replace('.', ',')}`}
+            value={`R$ ${formatarMoeda(faturamento.totalFaturado || 0)}`}
             icon={<DollarSign size={20} />} 
             color="emerald" 
           />
@@ -343,15 +344,15 @@ export function RelatorioPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-500 font-medium text-right">
-                        R$ {Number(r.salarioBase || 0).toFixed(2).replace('.', ',')}
+                        R$ {formatarMoeda(r.salarioBase || 0)}
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-blue-600 text-right">
-                        + R$ {Number(r.totalComissao || 0).toFixed(2).replace('.', ',')}
+                        + R$ {formatarMoeda(r.totalComissao || 0)}
                         <span className="block text-[10px] text-slate-400 font-medium mt-0.5">({r.percentualComissao}% de repasse)</span>
                       </td>
                       <td className="px-6 py-4 text-right bg-emerald-50/30">
                         <span className="text-lg font-black text-emerald-600">
-                          R$ {Number(r.totalReceber || 0).toFixed(2).replace('.', ',')}
+                          R$ {formatarMoeda(r.totalReceber || 0)}
                         </span>
                       </td>
                     </tr>

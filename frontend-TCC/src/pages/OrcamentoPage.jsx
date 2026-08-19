@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { formatarMoeda } from '../utils/formatters';
 import api from '../services/api';
 import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search, ChevronLeft, ChevronRight, Edit2, Play } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
@@ -519,7 +520,7 @@ export function OrcamentoPage() {
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-xl font-black text-slate-900">R$ {Number(orc.valorTotal || 0).toFixed(2)}</p>
+                  <p className="text-xl font-black text-slate-900">R$ {formatarMoeda(orc.valorTotal || 0)}</p>
                   
                   <div className="flex items-center gap-1 mt-2 justify-end">
                     <select 
@@ -632,15 +633,15 @@ export function OrcamentoPage() {
                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
                       <div className="flex justify-between items-center text-sm font-medium text-slate-600">
                         <span>Total dos Serviços:</span>
-                        <span>R$ {form.itensServico.reduce((acc, i) => acc + Number(i.precoCobrado || 0), 0).toFixed(2)}</span>
+                        <span>R$ {formatarMoeda(form.itensServico.reduce((acc, i) => acc + Number(i.precoCobrado || 0), 0))}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm font-medium text-slate-600">
                         <span>Total dos Materiais:</span>
-                        <span>R$ {form.materiais.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0).toFixed(2)}</span>
+                        <span>R$ {formatarMoeda(form.materiais.reduce((acc, i) => acc + Number(i.precoTotal || 0), 0))}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm font-medium text-slate-600">
                         <span>Deslocação (Km):</span>
-                        <span>R$ {((Number(form.quilometragem) || 0) * (Number(form.valorKm) || 0)).toFixed(2)}</span>
+                        <span>R$ {formatarMoeda(((Number(form.quilometragem) || 0) * (Number(form.valorKm) || 0)))}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm font-medium text-slate-600 border-b border-slate-200 pb-3">
                         <span className="mt-2">Desconto (R$):</span>
@@ -648,7 +649,7 @@ export function OrcamentoPage() {
                       </div>
                       <div className="flex justify-between items-center pt-1">
                         <span className="text-base font-bold text-slate-900">Total Geral:</span>
-                        <span className="text-2xl font-black text-emerald-600">R$ {form.valorTotal.toFixed(2)}</span>
+                        <span className="text-2xl font-black text-emerald-600">R$ {formatarMoeda(form.valorTotal)}</span>
                       </div>
                     </div>
                   </div>
@@ -678,7 +679,7 @@ export function OrcamentoPage() {
                           <div key={s.id} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition">
                             <div>
                               <p className="text-sm font-bold text-slate-900">{s.nomeServico}</p>
-                              <p className="text-xs text-slate-500 font-medium mt-0.5">R$ {Number(s.precoTabela).toFixed(2)}</p>
+                              <p className="text-xs text-slate-500 font-medium mt-0.5">R$ {formatarMoeda(s.precoTabela)}</p>
                             </div>
                             <button type="button" onClick={() => adicionarServicoCatalogo(s)} className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition">
                               <Plus size={16} />
@@ -774,7 +775,7 @@ export function OrcamentoPage() {
                                 <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded text-[9px] uppercase tracking-wider">{m.unidadeMedida}</span>
                                 {m.nomeMaterial}
                               </p>
-                              <p className="text-xs text-slate-500 font-medium mt-0.5">R$ {Number(m.precoTabela).toFixed(2)}</p>
+                              <p className="text-xs text-slate-500 font-medium mt-0.5">R$ {formatarMoeda(m.precoTabela)}</p>
                             </div>
                             <button type="button" onClick={() => adicionarMaterialCatalogo(m)} className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition">
                               <Plus size={16} />
@@ -848,7 +849,7 @@ export function OrcamentoPage() {
                               </div>
                               <div className="flex flex-col w-24">
                                 <label className="text-[10px] font-bold text-slate-500 uppercase">Total</label>
-                                <span className="px-2 py-1 text-sm font-black text-slate-900">R$ {Number(item.precoTotal).toFixed(2)}</span>
+                                <span className="px-2 py-1 text-sm font-black text-slate-900">R$ {formatarMoeda(item.precoTotal)}</span>
                               </div>
                               <button type="button" onClick={() => removerMaterial(index)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition self-end">
                                 <Trash2 size={16} />

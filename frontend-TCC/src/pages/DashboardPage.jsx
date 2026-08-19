@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { Users, ClipboardList, ArrowUpRight, CheckCircle2, Calendar, Activity, Folder, FileText, Clock, ChevronRight, PlusCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
+import { formatarMoeda } from '../utils/formatters';
 // --- Hook para Animação dos Números (CountUp) ---
 function AnimatedNumber({ value, prefix = '', suffix = '', isCurrency = false }) {
   const [count, setCount] = useState(0);
@@ -32,7 +32,7 @@ function AnimatedNumber({ value, prefix = '', suffix = '', isCurrency = false })
   }, [value]);
 
   if (isCurrency) {
-    return <span>{prefix}{count.toFixed(2).replace('.', ',')}{suffix}</span>;
+    return <span>{prefix}{formatarMoeda(count)}{suffix}</span>;
   }
   return <span>{prefix}{Math.floor(count)}{suffix}</span>;
 }
