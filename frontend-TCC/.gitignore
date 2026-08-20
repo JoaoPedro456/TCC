@@ -27,9 +27,14 @@ dist-ssr
 .env              ← Local com localhost (NÃO SUBIR)
 .env.local
 .env.*.local
+.env-prod
 
 # Frontend
 node_modules/
 dist/
 
-.env-prod
+
+
+# Arquivos de ambiente
+*.env*
+.env
