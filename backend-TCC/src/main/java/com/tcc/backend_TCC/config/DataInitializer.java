@@ -21,7 +21,7 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Value("${admin.default-password:admin123}")
+    @Value("${admin.default-password:#{null}}")
     private String defaultAdminPassword;
 
     @Override
@@ -34,17 +34,18 @@ public class DataInitializer implements CommandLineRunner {
         });
 
         if (usuarioRepository.count() == 0) {
+            String senha = defaultAdminPassword;
+            if (senha == null || senha.trim().isEmpty()) {
+                senha = java.util.UUID.randomUUID().toString().substring(0, 8);
+                log.warn("Nenhuma senha padrao fornecida via variavel de ambiente.");
+                log.warn("Senha gerada aleatoriamente para o primeiro acesso: " + senha);
+            }
+            
             Usuario admin = new Usuario();
             admin.setLogin("Andressa");
-            admin.setSenha(passwordEncoder.encode(defaultAdminPassword));
+            admin.setSenha(passwordEncoder.encode(senha));
             admin.setRole("ADMIN");
             usuarioRepository.save(admin);
-
-            log.warn("============================================");
-            log.warn("  USUARIO ADMIN CRIADO AUTOMATICAMENTE!");
-            log.warn("  Login: Andressa");
-            log.warn("  ALTERE A SENHA APOS O PRIMEIRO ACESSO!");
-            log.warn("============================================");
         }
     }
 }
