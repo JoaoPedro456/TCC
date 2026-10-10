@@ -7,6 +7,9 @@ import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.lowagie.text.pdf.PdfCopy;
+import com.lowagie.text.pdf.PdfReader;
+import com.tcc.backend_TCC.exception.OperacaoInvalidaException;
 import com.tcc.backend_TCC.exception.RecursoNaoEncontradoException;
 import com.tcc.backend_TCC.model.OrdemServico;
 import com.tcc.backend_TCC.model.OrdemServicoItem;
@@ -62,6 +65,49 @@ public class ImpressaoService {
 
         document.close();
         return baos.toByteArray();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] gerarPdfMultiplasOs(List<Long> osIds) throws Exception {
+        if (osIds == null || osIds.isEmpty()) {
+            throw new OperacaoInvalidaException("Nenhuma OS informada para geração do PDF.");
+        }
+        List<OrdemServico> ordens = osRepository.findAllById(osIds);
+        if (ordens.isEmpty()) {
+            throw new RecursoNaoEncontradoException("Nenhuma Ordem de Serviço encontrada com os IDs fornecidos.");
+        }
+
+        // Ordenar as ordens por ID crescente para manter sequência lógica das notas
+        ordens.sort((a, b) -> a.getId().compareTo(b.getId()));
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Document document = new Document();
+        PdfCopy copy = new PdfCopy(document, baos);
+        document.open();
+
+        for (OrdemServico os : ordens) {
+            byte[] singlePdf = gerarPdfOs(os.getId());
+            PdfReader reader = new PdfReader(singlePdf);
+            int pages = reader.getNumberOfPages();
+            for (int p = 1; p <= pages; p++) {
+                copy.addPage(copy.getImportedPage(reader, p));
+            }
+            copy.freeReader(reader);
+            reader.close();
+        }
+
+        document.close();
+        return baos.toByteArray();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] gerarPdfOsClientePeriodo(Long clienteId, LocalDate inicio, LocalDate fim) throws Exception {
+        List<OrdemServico> ordens = osRepository.findByClienteEPeriodo(clienteId, inicio, fim);
+        if (ordens == null || ordens.isEmpty()) {
+            throw new OperacaoInvalidaException("Nenhuma Ordem de Serviço encontrada para este cliente no período selecionado.");
+        }
+        List<Long> ids = ordens.stream().map(OrdemServico::getId).toList();
+        return gerarPdfMultiplasOs(ids);
     }
 
     @Autowired
@@ -532,7 +578,10 @@ public class ImpressaoService {
             }
         }
 
-        BigDecimal valorServicos = totalGeral.subtract(custoKm).subtract(valorTotalMateriais);
+        BigDecimal valorTorno = os.getValorTorno() != null ? os.getValorTorno() : BigDecimal.ZERO;
+        boolean temValorTorno = valorTorno.compareTo(BigDecimal.ZERO) > 0;
+
+        BigDecimal valorServicos = totalGeral.subtract(custoKm).subtract(valorTotalMateriais).subtract(valorTorno);
         if (valorServicos.compareTo(BigDecimal.ZERO) < 0) {
             valorServicos = BigDecimal.ZERO;
         }
@@ -540,7 +589,7 @@ public class ImpressaoService {
         boolean temServicos = os.getItensServico() != null && !os.getItensServico().isEmpty();
         boolean temCustoKm = custoKm.compareTo(BigDecimal.ZERO) > 0;
 
-        if (temServicos || temCustoKm || temMateriais) {
+        if (temServicos || temCustoKm || temMateriais || temValorTorno) {
             document.add(buildSectionHeader("Detalhamento de Valores"));
 
             PdfPTable tSvc = new PdfPTable(2);
@@ -566,6 +615,11 @@ public class ImpressaoService {
                     tSvc.addCell(styledCell(safe(texto), Element.ALIGN_LEFT));
                     tSvc.addCell(styledCell("R$ " + String.format("%.2f", m.getPrecoTotal() != null ? m.getPrecoTotal() : BigDecimal.ZERO).replace(".", ","), Element.ALIGN_RIGHT));
                 }
+            }
+
+            if (temValorTorno) {
+                tSvc.addCell(styledCell("Serviço de Torno", Element.ALIGN_LEFT));
+                tSvc.addCell(styledCell("R$ " + String.format("%.2f", valorTorno).replace(".", ","), Element.ALIGN_RIGHT));
             }
 
             if (temCustoKm) {
@@ -595,6 +649,9 @@ public class ImpressaoService {
         addResumoLinhaOS(resumo, "Total dos Serviços:", valorServicos);
         if (temMateriais) {
             addResumoLinhaOS(resumo, "Total Materiais:", valorTotalMateriais);
+        }
+        if (temValorTorno) {
+            addResumoLinhaOS(resumo, "Serviço de Torno:", valorTorno);
         }
         if (temCustoKm) {
             addResumoLinhaOS(resumo, "Deslocação:", custoKm);

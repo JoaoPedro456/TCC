@@ -27,6 +27,9 @@ public interface LancamentoRepository extends JpaRepository<Lancamento, Long> {
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(l.valor), 0) FROM Lancamento l WHERE l.tipo = :tipo AND l.status <> 'PAGO'")
     java.math.BigDecimal sumPendenteByTipo(@org.springframework.data.repository.query.Param("tipo") com.tcc.backend_TCC.enuns.TipoLancamento tipo);
 
-    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(CASE WHEN l.tipo = 'RECEBER' THEN l.valor ELSE -l.valor END), 0) FROM Lancamento l WHERE l.status = 'PAGO'")
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(" +
+           "CASE WHEN l.tipo = 'RECEBER' THEN COALESCE(l.valorPago, l.valor - COALESCE(l.desconto, 0)) " +
+           "     ELSE -COALESCE(l.valorPago, l.valor - COALESCE(l.desconto, 0)) END), 0) " +
+           "FROM Lancamento l WHERE l.status = 'PAGO'")
     java.math.BigDecimal getSaldoAtual();
 }

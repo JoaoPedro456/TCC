@@ -47,6 +47,9 @@ public class OrdemServicoService {
     @Autowired
     private LancamentoRepository lancamentoRepository;
 
+    @Autowired
+    private LancamentoService lancamentoService;
+
     @Transactional
     public OrdemServico salvar(OrdemServicoDTO dto) {
         OrdemServico os = new OrdemServico();
@@ -82,15 +85,20 @@ public class OrdemServicoService {
             BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
             BigDecimal custoKm = qtdKm.multiply(valorKm);
             totalCalculado = totalCalculado.add(custoKm);
+            if (dto.getValorTorno() != null) {
+                totalCalculado = totalCalculado.add(dto.getValorTorno());
+            }
 
             BigDecimal diferenca = valorTotal.subtract(totalCalculado).abs();
             if (diferenca.compareTo(new BigDecimal("0.02")) > 0) {
                 throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
-                        "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços, materiais e deslocamento (R$ " + totalCalculado + ").");
+                        "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços, materiais, torno e deslocamento (R$ " + totalCalculado + ").");
             }
         }
 
+        BigDecimal valorTorno = dto.getValorTorno() != null ? dto.getValorTorno() : BigDecimal.ZERO;
         os.setValorKm(valorKm);
+        os.setValorTorno(valorTorno);
         os.setValorTotal(valorTotal);
         os.setStatus(StatusOS.ABERTA);
 
@@ -139,7 +147,7 @@ public class OrdemServicoService {
         if (dto.getMecanicos() != null && !dto.getMecanicos().isEmpty()) {
             BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
             BigDecimal custoKm = qtdKm.multiply(valorKm);
-            BigDecimal valorApenasServico = valorTotal.subtract(custoKm).subtract(valorTotalMateriais);
+            BigDecimal valorApenasServico = valorTotal.subtract(custoKm).subtract(valorTotalMateriais).subtract(valorTorno).max(BigDecimal.ZERO);
 
             List<OrdemServicoMecanico> mecanicos = new ArrayList<>();
             for (var mDto : dto.getMecanicos()) {
@@ -202,15 +210,20 @@ public class OrdemServicoService {
             BigDecimal qtdKm = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
             BigDecimal custoKm = qtdKm.multiply(valorKm);
             totalCalculado = totalCalculado.add(custoKm);
+            if (dto.getValorTorno() != null) {
+                totalCalculado = totalCalculado.add(dto.getValorTorno());
+            }
 
             BigDecimal diferenca = valorTotal.subtract(totalCalculado).abs();
             if (diferenca.compareTo(new BigDecimal("0.02")) > 0) {
                 throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
-                        "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços, materiais e deslocamento (R$ " + totalCalculado + ").");
+                        "O valor total enviado (R$ " + valorTotal + ") diverge da soma dos serviços, materiais, torno e deslocamento (R$ " + totalCalculado + ").");
             }
         }
 
+        BigDecimal valorTorno = dto.getValorTorno() != null ? dto.getValorTorno() : BigDecimal.ZERO;
         os.setValorKm(valorKm);
+        os.setValorTorno(valorTorno);
         os.setValorTotal(valorTotal);
 
         // --- Itens do catálogo ---
@@ -257,7 +270,7 @@ public class OrdemServicoService {
         if (dto.getMecanicos() != null && !dto.getMecanicos().isEmpty()) {
             BigDecimal qtdKmParaCalculo = BigDecimal.valueOf(dto.getQuilometragem() != null ? dto.getQuilometragem() : 0);
             BigDecimal custoKmParaCalculo = qtdKmParaCalculo.multiply(valorKm);
-            BigDecimal valorApenasServico = valorTotal.subtract(custoKmParaCalculo).subtract(valorTotalMateriais);
+            BigDecimal valorApenasServico = valorTotal.subtract(custoKmParaCalculo).subtract(valorTotalMateriais).subtract(valorTorno).max(BigDecimal.ZERO);
 
             for (var mDto : dto.getMecanicos()) {
                 Pessoa func = pessoaRepository.findById(mDto.getMecanico().getId())
@@ -374,6 +387,16 @@ public class OrdemServicoService {
     }
 
     @Transactional
+    public void atualizarStatusEmLote(List<Long> ids, String status) {
+        if (ids == null || ids.isEmpty()) {
+            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException("Nenhuma OS informada para atualização de status.");
+        }
+        for (Long id : ids) {
+            atualizarStatus(id, status);
+        }
+    }
+
+    @Transactional
     public void excluir(Long id) {
         if (!repository.existsById(id)) {
             throw new RecursoNaoEncontradoException("OS não encontrada com ID: " + id);
@@ -387,5 +410,52 @@ public class OrdemServicoService {
 
     public BigDecimal calcularTotalComissaoMecanico(Long idMecanico, LocalDate inicio, LocalDate fim) {
         return mecanicoRepository.totalComissaoPorMecanicoEPeriodo(idMecanico, inicio, fim);
+    }
+
+    @Transactional
+    public void darBaixaEmLote(BaixaLoteDTO dto) {
+        if (dto.getIds() == null || dto.getIds().isEmpty()) {
+            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException("Nenhuma OS informada para baixa.");
+        }
+
+        List<Long> lancamentoIds = new ArrayList<>();
+        java.util.Map<Long, Long> osIdParaLancamentoId = new java.util.HashMap<>();
+
+        for (Long osId : dto.getIds()) {
+            OrdemServico os = buscarPorId(osId);
+            if (os.getStatus() != StatusOS.CONCLUIDA) {
+                os = atualizarStatus(osId, "CONCLUIDA");
+            }
+            Lancamento lanc = lancamentoRepository.findByOrdemServicoId(os.getId())
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Lançamento financeiro não encontrado para OS #" + osId));
+            lancamentoIds.add(lanc.getId());
+            osIdParaLancamentoId.put(osId, lanc.getId());
+        }
+
+        BaixaLoteDTO baixaLancamentoDTO = new BaixaLoteDTO();
+        baixaLancamentoDTO.setIds(lancamentoIds);
+        baixaLancamentoDTO.setDescontoTotal(dto.getDescontoTotal());
+        baixaLancamentoDTO.setDataPagamento(dto.getDataPagamento());
+        baixaLancamentoDTO.setFormaPagamento(dto.getFormaPagamento());
+        baixaLancamentoDTO.setPagamentoParcial(dto.getPagamentoParcial());
+        baixaLancamentoDTO.setValorRecebidoParcial(dto.getValorRecebidoParcial());
+        baixaLancamentoDTO.setNovoVencimentoRestante(dto.getNovoVencimentoRestante());
+
+        if (dto.getItens() != null && !dto.getItens().isEmpty()) {
+            List<BaixaLoteDTO.ItemBaixaDTO> itensLancamento = new ArrayList<>();
+            for (var itemOs : dto.getItens()) {
+                Long lancId = osIdParaLancamentoId.get(itemOs.getId());
+                if (lancId != null) {
+                    BaixaLoteDTO.ItemBaixaDTO itemLanc = new BaixaLoteDTO.ItemBaixaDTO();
+                    itemLanc.setId(lancId);
+                    itemLanc.setDesconto(itemOs.getDesconto());
+                    itemLanc.setValorPago(itemOs.getValorPago());
+                    itensLancamento.add(itemLanc);
+                }
+            }
+            baixaLancamentoDTO.setItens(itensLancamento);
+        }
+
+        lancamentoService.darBaixaEmLoteComDesconto(baixaLancamentoDTO);
     }
 }

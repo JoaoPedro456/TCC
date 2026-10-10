@@ -1,7 +1,6 @@
 package com.tcc.backend_TCC.security;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +20,6 @@ public class JwtService {
 
     @Autowired
     public JwtService(Environment env) {
-        // Lê do application.properties (ou variável de ambiente JWT_SECRET)
         this.SECRET = env.getProperty("jwt.secret");
         if (this.SECRET == null || this.SECRET.isBlank()) {
             throw new IllegalStateException("JWT_SECRET não configurado! Configure a variável de ambiente JWT_SECRET.");
@@ -37,9 +35,6 @@ public class JwtService {
         return Keys.hmacShaKeyFor(SECRET.getBytes());
     }
 
-    /**
-     * Gera token JWT com login e role (armazenados como claims)
-     */
     public String gerarToken(String login, String role) {
         return Jwts.builder()
                 .subject(login)

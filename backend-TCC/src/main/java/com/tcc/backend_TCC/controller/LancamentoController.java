@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import com.tcc.backend_TCC.model.BaixaLancamentoDTO;
+import com.tcc.backend_TCC.model.BaixaLoteDTO;
+
 @RestController
 @RequestMapping("/api/financeiro")
 public class LancamentoController {
@@ -44,9 +47,22 @@ public class LancamentoController {
         return service.atualizarStatus(id, status);
     }
 
+    @PutMapping("/{id}/baixa")
+    public Lancamento darBaixa(
+            @PathVariable Long id,
+            @RequestBody(required = false) BaixaLancamentoDTO dto) {
+        return service.darBaixa(id, dto);
+    }
+
     @PutMapping("/status-lote")
     public ResponseEntity<Void> atualizarStatusEmLote(@RequestBody List<Long> ids, @RequestParam String status) {
         service.atualizarStatusEmLote(ids, status);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/baixa-lote")
+    public ResponseEntity<Void> darBaixaEmLote(@RequestBody BaixaLoteDTO dto) {
+        service.darBaixaEmLoteComDesconto(dto);
         return ResponseEntity.noContent().build();
     }
 

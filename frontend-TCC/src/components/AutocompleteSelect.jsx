@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, Search, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 export function AutocompleteSelect({
   options = [],
@@ -10,7 +10,9 @@ export function AutocompleteSelect({
   required = false,
   className = '',
   pageSize = 5,
-  fetchOptions = null // Se fornecido, busca no backend
+  fetchOptions = null, // Se fornecido, busca no backend
+  onQuickCreate = null,
+  quickCreateLabel = 'Cadastrar rápido'
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -145,6 +147,21 @@ export function AutocompleteSelect({
 
           {/* Lista de Opções */}
           <div className="space-y-1 max-h-[200px] overflow-y-auto pr-0.5">
+            {onQuickCreate && searchTerm.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onQuickCreate(searchTerm.trim());
+                  setIsOpen(false);
+                  setSearchTerm('');
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg bg-blue-50/80 hover:bg-blue-100 text-blue-700 transition-colors flex items-center gap-1.5 text-xs font-semibold border border-blue-200/70 mb-1 cursor-pointer"
+              >
+                <Plus size={13} className="shrink-0" />
+                <span>{quickCreateLabel}: <span className="underline italic">"{searchTerm.trim()}"</span></span>
+              </button>
+            )}
+
             {isLoading ? (
               <div className="py-5 text-center text-slate-400 text-xs font-medium">
                 Buscando...

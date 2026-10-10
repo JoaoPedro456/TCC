@@ -46,6 +46,17 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
     @EntityGraph(attributePaths = {"cliente", "mecanicos", "mecanicos.mecanico"})
     List<OrdemServico> findByDataRegistoBetween(LocalDate inicio, LocalDate fim);
 
+    @EntityGraph(attributePaths = {"cliente", "mecanicos", "mecanicos.mecanico"})
+    @Query("SELECT os FROM OrdemServico os WHERE os.cliente.id = :clienteId " +
+           "AND COALESCE(os.dataRealizacao, os.dataRegisto) BETWEEN :inicio AND :fim " +
+           "AND os.status <> 'CANCELADA' " +
+           "ORDER BY COALESCE(os.dataRealizacao, os.dataRegisto) ASC, os.id ASC")
+    List<OrdemServico> findByClienteEPeriodo(
+            @Param("clienteId") Long clienteId,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim
+    );
+
     // Corrigido: valorServico → valorTotal
     @Query("SELECT COALESCE(SUM(os.valorTotal), 0) FROM OrdemServico os " +
             "WHERE os.dataRegisto BETWEEN :inicio AND :fim " +

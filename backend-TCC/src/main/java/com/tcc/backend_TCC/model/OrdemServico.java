@@ -53,6 +53,10 @@ public class OrdemServico {
     @DecimalMin(value = "0.0", message = "Valor do KM não pode ser negativo")
     private BigDecimal valorKm;
 
+    // --- NOVO CAMPO: Valor do serviço de torno (não incide comissão) ---
+    @DecimalMin(value = "0.0", message = "Valor do torno não pode ser negativo")
+    private BigDecimal valorTorno;
+
     @NotNull(message = "Valor total é obrigatório")
     @DecimalMin(value = "0.0", message = "Valor total não pode ser negativo")
     private BigDecimal valorTotal;

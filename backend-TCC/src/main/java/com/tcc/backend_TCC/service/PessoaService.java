@@ -45,6 +45,7 @@ public class PessoaService {
     }
 
     public Pessoa salvar(Pessoa p) {
+        normalizarDados(p);
         // Se for CPF, verifica se existe registro inativo e reativa/atualiza
         if (p.getCpf() != null && !p.getCpf().trim().isEmpty()) {
             if (!isValidCPF(p.getCpf())) {
@@ -82,6 +83,7 @@ public class PessoaService {
     }
 
     public Pessoa atualizar(Long id, Pessoa pAtualizada) {
+        normalizarDados(pAtualizada);
         Pessoa pExistente = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pessoa nao encontrada"));
 
@@ -91,6 +93,20 @@ public class PessoaService {
         atualizarDadosExistentes(pExistente, pAtualizada);
 
         return repository.save(pExistente);
+    }
+
+    private void normalizarDados(Pessoa p) {
+        if (p.getCpf() != null && p.getCpf().trim().isEmpty()) p.setCpf(null);
+        if (p.getCnpj() != null && p.getCnpj().trim().isEmpty()) p.setCnpj(null);
+        if (p.getTelefone() != null && p.getTelefone().trim().isEmpty()) p.setTelefone(null);
+        if (p.getCep() != null && p.getCep().trim().isEmpty()) p.setCep(null);
+        if (p.getLogradouro() != null && p.getLogradouro().trim().isEmpty()) p.setLogradouro(null);
+        if (p.getNumero() != null && p.getNumero().trim().isEmpty()) p.setNumero(null);
+        if (p.getComplemento() != null && p.getComplemento().trim().isEmpty()) p.setComplemento(null);
+        if (p.getBairro() != null && p.getBairro().trim().isEmpty()) p.setBairro(null);
+        if (p.getCidade() != null && p.getCidade().trim().isEmpty()) p.setCidade(null);
+        if (p.getEstado() != null && p.getEstado().trim().isEmpty()) p.setEstado(null);
+        if (p.getCargo() != null && p.getCargo().trim().isEmpty()) p.setCargo(null);
     }
 
     public void excluir(Long id) {

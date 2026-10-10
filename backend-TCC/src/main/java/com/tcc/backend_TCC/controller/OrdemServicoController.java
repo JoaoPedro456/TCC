@@ -1,6 +1,7 @@
 package com.tcc.backend_TCC.controller;
 
 import com.tcc.backend_TCC.enuns.StatusOS;
+import com.tcc.backend_TCC.model.BaixaLoteDTO;
 import com.tcc.backend_TCC.model.OrdemServico;
 import com.tcc.backend_TCC.model.OrdemServicoDTO;
 import com.tcc.backend_TCC.service.ImpressaoService;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -49,7 +51,7 @@ public class OrdemServicoController {
     public Page<OrdemServico> listar(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String busca,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "id", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
         StatusOS statusEnum = null;
         if (status != null && !status.isBlank() && !"TODOS".equals(status)) {
             statusEnum = StatusOS.valueOf(status);
@@ -67,6 +69,14 @@ public class OrdemServicoController {
             @PathVariable @Min(value = 1, message = "ID inválido") Long id,
             @RequestParam @NotBlank(message = "Status é obrigatório") String status) {
         return service.atualizarStatus(id, status);
+    }
+
+    @PutMapping("/status-lote")
+    public ResponseEntity<Void> atualizarStatusEmLote(
+            @RequestBody List<Long> ids,
+            @RequestParam @NotBlank(message = "Status é obrigatório") String status) {
+        service.atualizarStatusEmLote(ids, status);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
@@ -91,5 +101,35 @@ public class OrdemServicoController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=OS_" + id + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
+    }
+
+    @PostMapping("/pdf-lote")
+    public ResponseEntity<byte[]> gerarPdfLote(@RequestBody List<Long> ids) throws Exception {
+        byte[] pdf = impressaoService.gerarPdfMultiplasOs(ids);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=OS_Notas_Selecionadas.pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping("/cliente/{clienteId}/pdf-periodo")
+    public ResponseEntity<byte[]> gerarPdfClientePeriodo(
+            @PathVariable Long clienteId,
+            @RequestParam int mes,
+            @RequestParam int ano) throws Exception {
+        LocalDate inicio = LocalDate.of(ano, mes, 1);
+        LocalDate fim = inicio.withDayOfMonth(inicio.lengthOfMonth());
+        byte[] pdf = impressaoService.gerarPdfOsClientePeriodo(clienteId, inicio, fim);
+        String nomeArquivo = String.format("Notas_Cliente_%d_%02d_%d.pdf", clienteId, mes, ano);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + nomeArquivo)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @PutMapping("/baixa-lote")
+    public ResponseEntity<Void> darBaixaEmLote(@RequestBody BaixaLoteDTO dto) {
+        service.darBaixaEmLote(dto);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -50,4 +50,18 @@ public class Lancamento {
 
     @Column(name = "ordem_servico_id")
     private Long ordemServicoId;
+
+    @Column(name = "desconto")
+    @DecimalMin(value = "0.0", message = "Desconto não pode ser negativo")
+    private BigDecimal desconto;
+
+    @Column(name = "valor_pago")
+    @DecimalMin(value = "0.0", message = "Valor pago não pode ser negativo")
+    private BigDecimal valorPago;
+
+    @Column(name = "data_pagamento")
+    private LocalDate dataPagamento;
+
+    @Column(name = "forma_pagamento")
+    private String formaPagamento;
 }
