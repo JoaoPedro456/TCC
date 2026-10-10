@@ -73,12 +73,12 @@ export function MaterialPage() {
       fecharModal();
       await carregar();
     } catch (err) {
-      const msg = err.response?.data?.erro || 'Erro ao salvar material';
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao salvar material';
       if (err.response?.data?.campos) {
         const campos = err.response.data.campos.map(c => c.mensagem).join(', ');
         error(campos);
       } else {
-        error(msg);
+        error(typeof msg === 'string' ? msg : 'Erro ao salvar material');
       }
     } finally {
       setLoading(false);
@@ -92,7 +92,8 @@ export function MaterialPage() {
       await carregar();
       success('Material excluído com sucesso!');
     } catch (err) {
-      error('Erro ao excluir material');
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao excluir material';
+      error(typeof msg === 'string' ? msg : 'Erro ao excluir material');
     }
   };
 

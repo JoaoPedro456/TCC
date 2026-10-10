@@ -77,12 +77,12 @@ export function ServicoPage() {
       fecharModal();
       await carregar();
     } catch (err) {
-      const msg = err.response?.data?.erro || 'Erro ao salvar serviço';
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao salvar serviço';
       if (err.response?.data?.campos) {
         const campos = err.response.data.campos.map(c => c.mensagem).join(', ');
         error(campos);
       } else {
-        error(msg);
+        error(typeof msg === 'string' ? msg : 'Erro ao salvar serviço');
       }
     } finally {
       setLoading(false);
@@ -96,7 +96,8 @@ export function ServicoPage() {
       await carregar();
       success('Serviço excluído com sucesso!');
     } catch (err) {
-      error('Erro ao excluir serviço');
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao excluir serviço';
+      error(typeof msg === 'string' ? msg : 'Erro ao excluir serviço');
     }
   };
 

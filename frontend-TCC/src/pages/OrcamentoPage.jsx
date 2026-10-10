@@ -38,6 +38,7 @@ export function OrcamentoPage() {
   const [paginaOrc, setPaginaOrc] = useState(0);
   const [totalPaginasOrc, setTotalPaginasOrc] = useState(1);
   const [totalElementos, setTotalElementos] = useState(0);
+  const [aprovandoId, setAprovandoId] = useState(null);
 
   const { success, error } = useToast();
 
@@ -373,14 +374,18 @@ export function OrcamentoPage() {
   };
 
   const aprovarEGerarOS = async (id) => {
+    if (aprovandoId === id) return;
     if (!confirm('Deseja aprovar este orçamento e gerar uma Ordem de Serviço automaticamente?')) return;
+    setAprovandoId(id);
     try {
       const res = await api.post(`/orcamentos/${id}/aprovar`);
       await carregarOrcamentos();
       success(`Orçamento aprovado! OS #${res.data.id} gerada com sucesso!`);
     } catch (err) {
-      const msg = err.response?.data?.erro || 'Erro ao aprovar orçamento.';
-      error(msg);
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao aprovar orçamento.';
+      error(typeof msg === 'string' ? msg : 'Erro ao aprovar orçamento.');
+    } finally {
+      setAprovandoId(null);
     }
   };
 
@@ -390,8 +395,9 @@ export function OrcamentoPage() {
       await api.delete(`/orcamentos/${id}`);
       await carregarOrcamentos();
       success('Orçamento excluído com sucesso!');
-    } catch {
-      error('Erro ao excluir orçamento');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao excluir orçamento';
+      error(typeof msg === 'string' ? msg : 'Erro ao excluir orçamento');
     }
   };
 
@@ -525,6 +531,7 @@ export function OrcamentoPage() {
                   <div className="flex items-center gap-1 mt-2 justify-end">
                     <select 
                       value={orc.status || 'PENDENTE'} 
+                      disabled={orc.status === 'APROVADO' || aprovandoId === orc.id}
                       onChange={e => {
                         if (e.target.value === 'APROVADO') {
                           aprovarEGerarOS(orc.id);
@@ -532,7 +539,12 @@ export function OrcamentoPage() {
                           atualizarStatus(orc.id, e.target.value);
                         }
                       }} 
-                      className="text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 cursor-pointer outline-none focus:border-slate-400"
+                      className={`text-xs border rounded-md px-2 py-1.5 transition ${
+                        orc.status === 'APROVADO'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 cursor-not-allowed font-semibold'
+                          : 'bg-white text-slate-600 border-slate-200 cursor-pointer outline-none focus:border-slate-400'
+                      }`}
+                      title={orc.status === 'APROVADO' ? 'Orçamento já aprovado (OS gerada)' : 'Alterar status'}
                     >
                       <option value="PENDENTE">Pendente</option>
                       <option value="APROVADO">Aprovado</option>
@@ -540,15 +552,27 @@ export function OrcamentoPage() {
                       <option value="EXPIRADO">Expirado</option>
                     </select>
                     
-                    <button type="button" onClick={() => baixarPdf(orc.id)} className="text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1.5 transition" title="Baixar PDF">
+                    <button type="button" onClick={() => baixarPdf(orc.id)} className="text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1.5 transition cursor-pointer" title="Baixar PDF">
                       <Printer size={14} />
                     </button>
-                    <button type="button" onClick={() => abrirEditar(orc)} className="text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-md p-1.5 transition" title="Editar Orçamento">
-                      <Edit2 size={14} />
-                    </button>
-                    <button type="button" onClick={() => excluir(orc.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition">
-                      <Trash2 size={14} />
-                    </button>
+                    {orc.status === 'APROVADO' ? (
+                      <span className="text-slate-200 p-1.5 cursor-not-allowed inline-block" title="Orçamentos já aprovados não podem ser editados">
+                        <Edit2 size={14} className="opacity-30" />
+                      </span>
+                    ) : (
+                      <button type="button" onClick={() => abrirEditar(orc)} className="text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-md p-1.5 transition cursor-pointer" title="Editar Orçamento">
+                        <Edit2 size={14} />
+                      </button>
+                    )}
+                    {orc.status === 'APROVADO' ? (
+                      <span className="text-slate-200 p-1.5 cursor-not-allowed inline-block" title="Orçamentos já aprovados não podem ser excluídos">
+                        <Trash2 size={14} className="opacity-30" />
+                      </span>
+                    ) : (
+                      <button type="button" onClick={() => excluir(orc.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition cursor-pointer" title="Excluir Orçamento">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
