@@ -258,13 +258,18 @@ export function FaturamentoPage() {
   };
 
   const excluirLancamento = async (id) => {
+    const conta = contas.find(c => c.id === id);
+    if (conta && conta.status === 'PAGO') {
+      return error('Operação negada: Não é permitido excluir um lançamento financeiro já quitado.');
+    }
     if (!confirm('Tem certeza que deseja excluir?')) return;
     try {
       await api.delete(`/financeiro/${id}`);
       success('Lançamento excluído!');
       recarregarTudo();
     } catch (err) {
-      error('Erro ao excluir.');
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao excluir.';
+      error(typeof msg === 'string' ? msg : 'Erro ao excluir.');
     }
   };
 
@@ -643,12 +648,14 @@ export function FaturamentoPage() {
                           <div className="flex items-center gap-1.5">
                             <select 
                               value={conta.status} 
+                              disabled={conta.status === 'PAGO'}
                               onChange={(e) => atualizarStatus(conta.id, e.target.value)}
-                              className={`text-xs font-bold rounded-full px-2.5 py-1 cursor-pointer outline-none transition-colors border ${
-                                conta.status === 'PAGO' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
-                                conta.status === 'ATRASADO' ? 'bg-red-100 text-red-700 border-red-200' : 
-                                'bg-amber-100 text-amber-700 border-amber-200'
+                              className={`text-xs font-bold rounded-full px-2.5 py-1 transition-colors border ${
+                                conta.status === 'PAGO' ? 'bg-emerald-100 text-emerald-700 border-emerald-200 cursor-not-allowed opacity-90' : 
+                                conta.status === 'ATRASADO' ? 'bg-red-100 text-red-700 border-red-200 cursor-pointer outline-none' : 
+                                'bg-amber-100 text-amber-700 border-amber-200 cursor-pointer outline-none'
                               }`}
+                              title={conta.status === 'PAGO' ? 'Lançamentos já quitados não podem ter seu status alterado diretamente' : 'Alterar status'}
                             >
                               <option value="PENDENTE">⏳ Pendente</option>
                               <option value="PAGO">✅ Pago</option>
@@ -694,13 +701,22 @@ export function FaturamentoPage() {
                         )}
                       </td>
                       <td className="p-4 text-center">
-                        <button 
-                          onClick={() => excluirLancamento(conta.id)}
-                          className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                          title="Excluir Lançamento"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {conta.status === 'PAGO' ? (
+                          <span 
+                            className="text-slate-300 p-2 cursor-not-allowed inline-block"
+                            title="Lançamentos já quitados (PAGO) não podem ser excluídos"
+                          >
+                            <Trash2 size={16} className="opacity-30" />
+                          </span>
+                        ) : (
+                          <button 
+                            onClick={() => excluirLancamento(conta.id)}
+                            className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors cursor-pointer"
+                            title="Excluir Lançamento"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))

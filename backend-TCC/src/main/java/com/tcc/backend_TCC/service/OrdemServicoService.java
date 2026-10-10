@@ -150,8 +150,14 @@ public class OrdemServicoService {
             BigDecimal valorApenasServico = valorTotal.subtract(custoKm).subtract(valorTotalMateriais).subtract(valorTorno).max(BigDecimal.ZERO);
 
             List<OrdemServicoMecanico> mecanicos = new ArrayList<>();
+            java.util.Set<Long> idsMecanicosAdicionados = new java.util.HashSet<>();
             for (var mDto : dto.getMecanicos()) {
-                Pessoa func = pessoaRepository.findById(mDto.getMecanico().getId())
+                if (mDto.getMecanico() == null || mDto.getMecanico().getId() == null) continue;
+                Long mecId = mDto.getMecanico().getId();
+                if (idsMecanicosAdicionados.contains(mecId)) continue;
+                idsMecanicosAdicionados.add(mecId);
+
+                Pessoa func = pessoaRepository.findById(mecId)
                         .orElseThrow(() -> new RecursoNaoEncontradoException("Mecânico não encontrado"));
 
                 OrdemServicoMecanico osm = new OrdemServicoMecanico();
@@ -272,8 +278,14 @@ public class OrdemServicoService {
             BigDecimal custoKmParaCalculo = qtdKmParaCalculo.multiply(valorKm);
             BigDecimal valorApenasServico = valorTotal.subtract(custoKmParaCalculo).subtract(valorTotalMateriais).subtract(valorTorno).max(BigDecimal.ZERO);
 
+            java.util.Set<Long> idsMecanicosAdicionados = new java.util.HashSet<>();
             for (var mDto : dto.getMecanicos()) {
-                Pessoa func = pessoaRepository.findById(mDto.getMecanico().getId())
+                if (mDto.getMecanico() == null || mDto.getMecanico().getId() == null) continue;
+                Long mecId = mDto.getMecanico().getId();
+                if (idsMecanicosAdicionados.contains(mecId)) continue;
+                idsMecanicosAdicionados.add(mecId);
+
+                Pessoa func = pessoaRepository.findById(mecId)
                         .orElseThrow(() -> new RecursoNaoEncontradoException("Mecânico não encontrado"));
 
                 OrdemServicoMecanico osm = new OrdemServicoMecanico();
@@ -292,12 +304,25 @@ public class OrdemServicoService {
         }
 
         // Atualizar Lançamento Financeiro se existir
-        lancamentoRepository.findByOrdemServicoId(os.getId()).ifPresent(lancamento -> {
-            lancamento.setDescricao("OS #" + os.getId() + " - " + (os.getVeiculo() != null ? os.getVeiculo() : "Serviços"));
-            lancamento.setEnvolvido(os.getCliente() != null ? os.getCliente().getNome() : "Cliente não informado");
-            lancamento.setValor(os.getValorTotal());
-            lancamentoRepository.save(lancamento);
-        });
+        List<Lancamento> lancamentos = lancamentoRepository.findByOrdemServicoId(os.getId());
+        if (!lancamentos.isEmpty()) {
+            boolean temPago = lancamentos.stream().anyMatch(l -> l.getStatus() == StatusLancamento.PAGO);
+            if (temPago) {
+                BigDecimal totalLancamentos = lancamentos.stream()
+                        .map(Lancamento::getValor)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (totalLancamentos.compareTo(os.getValorTotal()) != 0) {
+                    throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                            "Operação negada: A OS #" + os.getId() + " possui faturamento já quitado ou baixado no Financeiro. Não é permitido alterar os valores de uma Ordem de Serviço com pagamentos registrados.");
+                }
+            } else {
+                Lancamento lancamento = lancamentos.get(0);
+                lancamento.setDescricao("OS #" + os.getId() + " - " + (os.getVeiculo() != null ? os.getVeiculo() : "Serviços"));
+                lancamento.setEnvolvido(os.getCliente() != null ? os.getCliente().getNome() : "Cliente não informado");
+                lancamento.setValor(os.getValorTotal());
+                lancamentoRepository.save(lancamento);
+            }
+        }
 
         return repository.save(os);
     }
@@ -357,29 +382,46 @@ public class OrdemServicoService {
 
         // Se o status da OS está mudando para CONCLUÍDA
         if (novoStatus == StatusOS.CONCLUIDA) {
-            // Busca se já existe um lançamento para esta OS
-            Lancamento contaReceber = lancamentoRepository.findByOrdemServicoId(os.getId())
-                    .orElse(new Lancamento());
-
-            contaReceber.setDescricao("OS #" + os.getId() + " - " + (os.getVeiculo() != null ? os.getVeiculo() : "Serviços"));
-            contaReceber.setEnvolvido(os.getCliente() != null ? os.getCliente().getNome() : "Cliente não informado");
-            contaReceber.setValor(os.getValorTotal());
-            if (contaReceber.getId() == null) {
-                contaReceber.setVencimento(LocalDate.now()); // Apenas define vencimento hoje se for novo
-                contaReceber.setTipo(TipoLancamento.RECEBER);
-                contaReceber.setStatus(StatusLancamento.PENDENTE);
-                contaReceber.setOrdemServicoId(os.getId());
+            if (os.getDataRealizacao() == null) {
+                os.setDataRealizacao(LocalDate.now());
             }
 
-            // Salva ou atualiza a conta na tabela de faturamento!
-            lancamentoRepository.save(contaReceber);
-        } else {
-            // Se o novo status NÃO é CONCLUÍDA (ex: reabriu ou cancelou), remove o lançamento se ainda estiver pendente
-            lancamentoRepository.findByOrdemServicoId(os.getId()).ifPresent(lancamento -> {
-                if (lancamento.getStatus() == StatusLancamento.PENDENTE) {
-                    lancamentoRepository.delete(lancamento);
+            // Busca se já existe um lançamento para esta OS
+            List<Lancamento> lancamentos = lancamentoRepository.findByOrdemServicoId(os.getId());
+            Lancamento contaReceber = lancamentos.stream()
+                    .filter(l -> l.getStatus() != StatusLancamento.PAGO)
+                    .findFirst()
+                    .orElse(null);
+
+            if (contaReceber == null) {
+                if (lancamentos.isEmpty()) {
+                    contaReceber = new Lancamento();
+                    contaReceber.setDescricao("OS #" + os.getId() + " - " + (os.getVeiculo() != null ? os.getVeiculo() : "Serviços"));
+                    contaReceber.setEnvolvido(os.getCliente() != null ? os.getCliente().getNome() : "Cliente não informado");
+                    contaReceber.setValor(os.getValorTotal());
+                    contaReceber.setVencimento(LocalDate.now());
+                    contaReceber.setTipo(TipoLancamento.RECEBER);
+                    contaReceber.setStatus(StatusLancamento.PENDENTE);
+                    contaReceber.setOrdemServicoId(os.getId());
+                    lancamentoRepository.save(contaReceber);
                 }
-            });
+            } else {
+                contaReceber.setDescricao("OS #" + os.getId() + " - " + (os.getVeiculo() != null ? os.getVeiculo() : "Serviços"));
+                contaReceber.setEnvolvido(os.getCliente() != null ? os.getCliente().getNome() : "Cliente não informado");
+                contaReceber.setValor(os.getValorTotal());
+                lancamentoRepository.save(contaReceber);
+            }
+        } else {
+            // Se o novo status NÃO é CONCLUÍDA (ex: reabriu ou cancelou)
+            List<Lancamento> lancamentos = lancamentoRepository.findByOrdemServicoId(os.getId());
+            for (Lancamento lancamento : lancamentos) {
+                if (lancamento.getStatus() == StatusLancamento.PAGO) {
+                    throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                            "Operação negada: A OS #" + os.getId() + " já possui faturamento quitado (PAGO). Não é possível alterar seu status para " + novoStatus + " sem antes tratar/estornar o pagamento no Financeiro.");
+                }
+                // Se a conta estiver em aberto (PENDENTE ou ATRASADO), remove-a pois a OS não está mais concluída
+                lancamentoRepository.delete(lancamento);
+            }
         }
 
         os.setStatus(novoStatus);
@@ -402,9 +444,14 @@ public class OrdemServicoService {
             throw new RecursoNaoEncontradoException("OS não encontrada com ID: " + id);
         }
         // Remove lançamentos vinculados se existirem
-        lancamentoRepository.findByOrdemServicoId(id).ifPresent(lancamento -> {
+        List<Lancamento> lancamentos = lancamentoRepository.findByOrdemServicoId(id);
+        for (Lancamento lancamento : lancamentos) {
+            if (lancamento.getStatus() == StatusLancamento.PAGO) {
+                throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                        "Operação negada: A OS #" + id + " possui lançamento financeiro já quitado (PAGO). Para garantir a integridade do caixa, não é permitido excluir uma OS já paga.");
+            }
             lancamentoRepository.delete(lancamento);
-        });
+        }
         repository.deleteById(id);
     }
 
@@ -426,8 +473,11 @@ public class OrdemServicoService {
             if (os.getStatus() != StatusOS.CONCLUIDA) {
                 os = atualizarStatus(osId, "CONCLUIDA");
             }
-            Lancamento lanc = lancamentoRepository.findByOrdemServicoId(os.getId())
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Lançamento financeiro não encontrado para OS #" + osId));
+            List<Lancamento> lancs = lancamentoRepository.findByOrdemServicoId(os.getId());
+            Lancamento lanc = lancs.stream()
+                    .filter(l -> l.getStatus() != StatusLancamento.PAGO)
+                    .findFirst()
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Lançamento financeiro pendente não encontrado para OS #" + osId));
             lancamentoIds.add(lanc.getId());
             osIdParaLancamentoId.put(osId, lanc.getId());
         }

@@ -486,8 +486,9 @@ export function OrdemServicoPage() {
       await api.put(`/ordens/${id}/status?status=${status}`);
       await carregarOrdens();
       success('Status atualizado!');
-    } catch {
-      error('Erro ao atualizar status');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao atualizar status';
+      error(typeof msg === 'string' ? msg : 'Erro ao atualizar status');
     }
   };
 
@@ -497,8 +498,9 @@ export function OrdemServicoPage() {
       await api.delete(`/ordens/${id}`);
       await carregarOrdens();
       success('OS excluída com sucesso!');
-    } catch {
-      error('Erro ao excluir OS');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao excluir OS';
+      error(typeof msg === 'string' ? msg : 'Erro ao excluir OS');
     }
   };
 
@@ -546,7 +548,8 @@ export function OrdemServicoPage() {
       setClienteRapidoNome('');
       setClienteRapidoTelefone('');
     } catch (err) {
-      error('Erro ao cadastrar cliente rápido');
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao cadastrar cliente rápido';
+      error(typeof msg === 'string' ? msg : 'Erro ao cadastrar cliente rápido');
     } finally {
       setSalvandoClienteRapido(false);
     }

@@ -901,7 +901,9 @@ public class ImpressaoService {
         for (OrdemServicoMecanico p : participacoes) {
             BigDecimal valorComissaoOs = p.getValorAtribuido() != null ? p.getValorAtribuido() : BigDecimal.ZERO;
 
-            String dataOS = p.getOrdemServico().getDataRegisto() != null ? p.getOrdemServico().getDataRegisto().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+            String dataOS = p.getOrdemServico().getDataRealizacao() != null 
+                    ? p.getOrdemServico().getDataRealizacao().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) 
+                    : (p.getOrdemServico().getDataRegisto() != null ? p.getOrdemServico().getDataRegisto().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A");
 
             table.addCell(styledCell(dataOS, Element.ALIGN_LEFT));
             table.addCell(styledCell(p.getOrdemServico().getId().toString(), Element.ALIGN_CENTER));

@@ -269,8 +269,8 @@ export function PessoaPage() {
       await carregar();
       success('Registro removido!');
     } catch (err) {
-      // console.error('Erro ao excluir:', err);
-      error('Erro ao excluir do servidor.');
+      const msg = err.response?.data?.message || err.response?.data?.erro || 'Erro ao excluir do servidor.';
+      error(typeof msg === 'string' ? msg : 'Erro ao excluir do servidor.');
     }
   };
 

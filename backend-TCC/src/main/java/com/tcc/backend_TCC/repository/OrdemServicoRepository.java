@@ -47,6 +47,10 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
     List<OrdemServico> findByDataRegistoBetween(LocalDate inicio, LocalDate fim);
 
     @EntityGraph(attributePaths = {"cliente", "mecanicos", "mecanicos.mecanico"})
+    @Query("SELECT os FROM OrdemServico os WHERE COALESCE(os.dataRealizacao, os.dataRegisto) BETWEEN :inicio AND :fim")
+    List<OrdemServico> findByPeriodoReferencia(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    @EntityGraph(attributePaths = {"cliente", "mecanicos", "mecanicos.mecanico"})
     @Query("SELECT os FROM OrdemServico os WHERE os.cliente.id = :clienteId " +
            "AND COALESCE(os.dataRealizacao, os.dataRegisto) BETWEEN :inicio AND :fim " +
            "AND os.status <> 'CANCELADA' " +
@@ -57,20 +61,20 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
             @Param("fim") LocalDate fim
     );
 
-    // Corrigido: valorServico → valorTotal
+    // Corrigido: Baseado na data de realização/conclusão da OS para não perder OSs que viram o mês
     @Query("SELECT COALESCE(SUM(os.valorTotal), 0) FROM OrdemServico os " +
-            "WHERE os.dataRegisto BETWEEN :inicio AND :fim " +
+            "WHERE COALESCE(os.dataRealizacao, os.dataRegisto) BETWEEN :inicio AND :fim " +
             "AND os.status = 'CONCLUIDA'")
     BigDecimal totalFaturadoPorPeriodo(
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim
     );
 
-    @Query("SELECT YEAR(os.dataRegisto) as ano, MONTH(os.dataRegisto) as mes, COALESCE(SUM(os.valorTotal), 0) as total " +
+    @Query("SELECT YEAR(COALESCE(os.dataRealizacao, os.dataRegisto)) as ano, MONTH(COALESCE(os.dataRealizacao, os.dataRegisto)) as mes, COALESCE(SUM(os.valorTotal), 0) as total " +
            "FROM OrdemServico os " +
            "WHERE os.status = 'CONCLUIDA' " +
-           "AND os.dataRegisto BETWEEN :inicio AND :fim " +
-           "GROUP BY YEAR(os.dataRegisto), MONTH(os.dataRegisto)")
+           "AND COALESCE(os.dataRealizacao, os.dataRegisto) BETWEEN :inicio AND :fim " +
+           "GROUP BY YEAR(COALESCE(os.dataRealizacao, os.dataRegisto)), MONTH(COALESCE(os.dataRealizacao, os.dataRegisto))")
     List<Object[]> faturamentoMensalAgrupado(
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim

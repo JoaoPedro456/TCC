@@ -58,6 +58,10 @@ public class LancamentoService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Lancamento nao encontrado com ID: " + id));
         try {
             StatusLancamento novoStatus = StatusLancamento.valueOf(status);
+            if (lancamento.getStatus() == StatusLancamento.PAGO && novoStatus != StatusLancamento.PAGO) {
+                throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                        "Operação não permitida: Uma conta já quitada (PAGO) não pode ter seu status alterado diretamente.");
+            }
             lancamento.setStatus(novoStatus);
             if (novoStatus == StatusLancamento.PAGO) {
                 if (lancamento.getDataPagamento() == null) {
@@ -163,6 +167,18 @@ public class LancamentoService {
         }
 
         List<Lancamento> lancamentos = repository.findAllById(ids);
+        if (novoStatus != StatusLancamento.PAGO) {
+            List<Lancamento> jaPagos = lancamentos.stream()
+                    .filter(l -> l.getStatus() == StatusLancamento.PAGO)
+                    .toList();
+            if (!jaPagos.isEmpty()) {
+                String idsPagos = jaPagos.stream()
+                        .map(l -> "#" + l.getId() + " (" + l.getDescricao() + ")")
+                        .collect(java.util.stream.Collectors.joining(", "));
+                throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                        "Operação cancelada: O lote contém contas já quitadas que não podem ter o status alterado: " + idsPagos);
+            }
+        }
         for (Lancamento l : lancamentos) {
             l.setStatus(novoStatus);
             if (novoStatus == StatusLancamento.PAGO) {
@@ -333,10 +349,15 @@ public class LancamentoService {
     }
 
     public void excluir(Long id) {
-        if (!repository.existsById(id)) {
-            throw new RecursoNaoEncontradoException("Lancamento nao encontrado com ID: " + id);
+        Lancamento lancamento = repository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Lancamento nao encontrado com ID: " + id));
+
+        if (lancamento.getStatus() == StatusLancamento.PAGO) {
+            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                    "Operação negada: Não é permitido excluir um lançamento financeiro que já foi quitado (PAGO).");
         }
-        repository.deleteById(id);
+
+        repository.delete(lancamento);
         log.info("Lancamento excluido: ID {}", id);
     }
 

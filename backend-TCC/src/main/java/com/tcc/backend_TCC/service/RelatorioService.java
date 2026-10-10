@@ -72,7 +72,7 @@ public class RelatorioService {
 
     public Map<String, Object> faturamentoPorPeriodo(LocalDate inicio, LocalDate fim) {
         BigDecimal total = zeroSeNulo(ordemServicoRepository.totalFaturadoPorPeriodo(inicio, fim));
-        List<OrdemServico> lista = ordemServicoRepository.findByDataRegistoBetween(inicio, fim);
+        List<OrdemServico> lista = ordemServicoRepository.findByPeriodoReferencia(inicio, fim);
 
         long concluidas = contarPorStatus(lista, "CONCLUIDA");
         long abertas = contarPorStatus(lista, "ABERTA");
@@ -92,10 +92,9 @@ public class RelatorioService {
         LocalDate hoje = LocalDate.now();
         LocalDate mesAtual = hoje.withDayOfMonth(1);
 
-        // NOTA: Como a entidade OrdemServico não possui uma coluna 'dataConclusao',
-        // o faturamento é calculado com base no regime de competência utilizando a 'dataRegisto'
-        // das ordens de serviço que se encontram no status 'CONCLUIDA'.
-        List<OrdemServico> lista = ordemServicoRepository.findByDataRegistoBetween(mesAtual, hoje);
+        // O faturamento e as métricas do período consideram a data de realização/conclusão da OS
+        // garantindo que ordens iniciadas em um mês e finalizadas em outro não sumam dos relatórios.
+        List<OrdemServico> lista = ordemServicoRepository.findByPeriodoReferencia(mesAtual, hoje);
 
         BigDecimal faturamentoMes = lista.stream()
                 .filter(os -> os.getStatus() != null && "CONCLUIDA".equals(os.getStatus().name()))
@@ -106,10 +105,22 @@ public class RelatorioService {
         long totalFuncionarios = pessoaRepository.countByTipoAndAtivoTrue(TipoPessoa.FUNCIONARIO);
         long osAbertas = contarPorStatus(lista, "ABERTA");
         long osConcluidasMes = contarPorStatus(lista, "CONCLUIDA");
-        long osHoje = lista.stream().filter(os -> os.getDataRegisto().equals(hoje)).count();
-        long hojeAbertas = lista.stream().filter(os -> os.getDataRegisto().equals(hoje) && os.getStatus() != null && "ABERTA".equals(os.getStatus().name())).count();
-        long hojeConcluidas = lista.stream().filter(os -> os.getDataRegisto().equals(hoje) && os.getStatus() != null && "CONCLUIDA".equals(os.getStatus().name())).count();
-        long hojeCanceladas = lista.stream().filter(os -> os.getDataRegisto().equals(hoje) && os.getStatus() != null && "CANCELADA".equals(os.getStatus().name())).count();
+        long osHoje = lista.stream().filter(os -> {
+            LocalDate ref = os.getDataRealizacao() != null ? os.getDataRealizacao() : os.getDataRegisto();
+            return hoje.equals(ref);
+        }).count();
+        long hojeAbertas = lista.stream().filter(os -> {
+            LocalDate ref = os.getDataRealizacao() != null ? os.getDataRealizacao() : os.getDataRegisto();
+            return hoje.equals(ref) && os.getStatus() != null && "ABERTA".equals(os.getStatus().name());
+        }).count();
+        long hojeConcluidas = lista.stream().filter(os -> {
+            LocalDate ref = os.getDataRealizacao() != null ? os.getDataRealizacao() : os.getDataRegisto();
+            return hoje.equals(ref) && os.getStatus() != null && "CONCLUIDA".equals(os.getStatus().name());
+        }).count();
+        long hojeCanceladas = lista.stream().filter(os -> {
+            LocalDate ref = os.getDataRealizacao() != null ? os.getDataRealizacao() : os.getDataRegisto();
+            return hoje.equals(ref) && os.getStatus() != null && "CANCELADA".equals(os.getStatus().name());
+        }).count();
 
         BigDecimal ticketMedio = osConcluidasMes > 0
                 ? faturamentoMes.divide(BigDecimal.valueOf(osConcluidasMes), 2, RoundingMode.HALF_UP)

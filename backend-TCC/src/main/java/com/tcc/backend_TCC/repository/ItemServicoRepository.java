@@ -20,4 +20,6 @@ public interface ItemServicoRepository extends JpaRepository<ItemServico, Long> 
 
     // Método sem paginação original (para compatibilidade, caso necessário)
     List<ItemServico> findByAtivoTrue();
+
+    java.util.Optional<ItemServico> findByNomeServicoIgnoreCaseAndAtivoTrue(String nomeServico);
 }

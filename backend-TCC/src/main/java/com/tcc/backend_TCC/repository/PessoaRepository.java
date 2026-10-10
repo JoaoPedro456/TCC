@@ -44,4 +44,5 @@ public interface PessoaRepository extends JpaRepository<Pessoa, Long> {
     Optional<Pessoa> findByCpfAndAtivoTrue(String cpf);
     Optional<Pessoa> findByCnpjAndAtivoTrue(String cnpj);
     Optional<Pessoa> findByTelefoneAndAtivoTrue(String telefone);
+    Optional<Pessoa> findByNomeIgnoreCaseAndTipoAndAtivoTrue(String nome, TipoPessoa tipo);
 }

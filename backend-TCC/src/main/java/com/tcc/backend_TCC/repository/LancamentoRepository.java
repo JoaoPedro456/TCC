@@ -10,8 +10,8 @@ import java.util.List;
 @Repository
 public interface LancamentoRepository extends JpaRepository<Lancamento, Long> {
     List<Lancamento> findByTipoOrderByVencimentoAsc(TipoLancamento tipo);
-    org.springframework.data.domain.Page<Lancamento> findByTipoOrderByVencimentoAsc(com.tcc.backend_TCC.enuns.TipoLancamento tipo, org.springframework.data.domain.Pageable pageable);
-    java.util.Optional<Lancamento> findByOrdemServicoId(Long ordemServicoId);
+    org.springframework.data.domain.Page<Lancamento> findByTipoOrderByVencimentoAsc(TipoLancamento tipo, org.springframework.data.domain.Pageable pageable);
+    List<Lancamento> findByOrdemServicoId(Long ordemServicoId);
     void deleteByOrdemServicoId(Long ordemServicoId);
 
     @org.springframework.data.jpa.repository.Query("SELECT l FROM Lancamento l " +

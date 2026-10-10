@@ -18,6 +18,12 @@ public class MaterialService {
 
     @Transactional
     public Material salvar(MaterialDTO dto) {
+        if (dto.getNomeMaterial() != null && !dto.getNomeMaterial().trim().isEmpty()) {
+            repository.findByNomeMaterialIgnoreCase(dto.getNomeMaterial().trim()).ifPresent(m -> {
+                throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                        "Já existe um material/peça cadastrado com o nome '" + dto.getNomeMaterial().trim() + "'.");
+            });
+        }
         Material mat = new Material();
         mat.setNomeMaterial(dto.getNomeMaterial());
         mat.setUnidadeMedida(dto.getUnidadeMedida());
@@ -29,6 +35,14 @@ public class MaterialService {
     public Material atualizar(Long id, MaterialDTO dto) {
         Material mat = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Material não encontrado"));
+        if (dto.getNomeMaterial() != null && !dto.getNomeMaterial().trim().isEmpty()) {
+            repository.findByNomeMaterialIgnoreCase(dto.getNomeMaterial().trim()).ifPresent(m -> {
+                if (!m.getId().equals(id)) {
+                    throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                            "Já existe outro material/peça cadastrado com o nome '" + dto.getNomeMaterial().trim() + "'.");
+                }
+            });
+        }
         mat.setNomeMaterial(dto.getNomeMaterial());
         mat.setUnidadeMedida(dto.getUnidadeMedida());
         mat.setPrecoTabela(dto.getPrecoTabela());

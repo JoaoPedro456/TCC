@@ -15,4 +15,6 @@ public interface MaterialRepository extends JpaRepository<Material, Long> {
            "(:busca IS NULL OR :busca = '' OR " +
            " LOWER(m.nomeMaterial) LIKE LOWER(CONCAT('%', :busca, '%')))")
     Page<Material> pesquisar(@Param("busca") String busca, Pageable pageable);
+
+    java.util.Optional<Material> findByNomeMaterialIgnoreCase(String nomeMaterial);
 }

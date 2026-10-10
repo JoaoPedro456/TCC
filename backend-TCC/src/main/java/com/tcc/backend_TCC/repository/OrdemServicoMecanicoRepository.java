@@ -17,16 +17,18 @@ public interface OrdemServicoMecanicoRepository extends JpaRepository<OrdemServi
 
     @Query("SELECT COUNT(m) FROM OrdemServicoMecanico m " +
             "WHERE m.mecanico.id = :mecanicoId " +
-            "AND m.ordemServico.dataRegisto BETWEEN :inicio AND :fim")
+            "AND m.ordemServico.status = 'CONCLUIDA' " +
+            "AND COALESCE(m.ordemServico.dataRealizacao, m.ordemServico.dataRegisto) BETWEEN :inicio AND :fim")
     long contarOSPormecanicoEPeriodo(
             @Param("mecanicoId") Long mecanicoId,
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim
     );
 
-    @Query("SELECT COALESCE(SUM(m.valorComissao), 0) FROM OrdemServicoMecanico m " +
+    @Query("SELECT COALESCE(SUM(COALESCE(m.valorComissao, m.valorAtribuido)), 0) FROM OrdemServicoMecanico m " +
             "WHERE m.mecanico.id = :mecanicoId " +
-            "AND m.ordemServico.dataRegisto BETWEEN :inicio AND :fim")
+            "AND m.ordemServico.status = 'CONCLUIDA' " +
+            "AND COALESCE(m.ordemServico.dataRealizacao, m.ordemServico.dataRegisto) BETWEEN :inicio AND :fim")
     BigDecimal totalComissaoPorMecanicoEPeriodo(
             @Param("mecanicoId") Long mecanicoId,
             @Param("inicio") LocalDate inicio,
@@ -36,6 +38,7 @@ public interface OrdemServicoMecanicoRepository extends JpaRepository<OrdemServi
     @Query("SELECT osm FROM OrdemServicoMecanico osm " +
             "WHERE osm.mecanico.id = :mecanicoId " +
             "AND osm.ordemServico.status = 'CONCLUIDA' " +
-            "AND osm.ordemServico.dataRegisto BETWEEN :inicio AND :fim")
+            "AND COALESCE(osm.ordemServico.dataRealizacao, osm.ordemServico.dataRegisto) BETWEEN :inicio AND :fim " +
+            "ORDER BY COALESCE(osm.ordemServico.dataRealizacao, osm.ordemServico.dataRegisto) ASC, osm.ordemServico.id ASC")
     List<OrdemServicoMecanico> buscarComissoesMes(@Param("mecanicoId") Long mecanicoId, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 }

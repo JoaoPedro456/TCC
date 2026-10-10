@@ -45,6 +45,10 @@ public class OrcamentoService {
     @Transactional
     public Orcamento atualizar(Long id, OrcamentoDTO dto) {
         Orcamento orc = buscarPorId(id);
+        if (orc.getStatus() == StatusOrcamento.APROVADO) {
+            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                    "Operação negada: Este orçamento já foi APROVADO e gerou uma Ordem de Serviço. Não é permitido editá-lo.");
+        }
         preencherDadosBasicos(orc, dto);
         return repository.save(orc);
     }
@@ -77,14 +81,18 @@ public class OrcamentoService {
                     catalogItem = itemServicoRepository.findById(itemDto.getItemServicoId())
                             .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço do catálogo não encontrado: " + itemDto.getItemServicoId()));
                 } else {
-                    // Criar serviço na hora
+                    // Criar serviço na hora ou reaproveitar existente com mesmo nome
                     if (itemDto.getDescricaoServico() == null || itemDto.getDescricaoServico().isBlank()) {
                         throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException("Serviços novos exigem uma descrição.");
                     }
-                    catalogItem = new ItemServico();
-                    catalogItem.setNomeServico(itemDto.getDescricaoServico());
-                    catalogItem.setPrecoTabela(itemDto.getPrecoCobrado());
-                    catalogItem = itemServicoRepository.save(catalogItem);
+                    String nomeServico = itemDto.getDescricaoServico().trim();
+                    catalogItem = itemServicoRepository.findByNomeServicoIgnoreCaseAndAtivoTrue(nomeServico)
+                            .orElseGet(() -> {
+                                ItemServico novo = new ItemServico();
+                                novo.setNomeServico(nomeServico);
+                                novo.setPrecoTabela(itemDto.getPrecoCobrado());
+                                return itemServicoRepository.save(novo);
+                            });
                 }
 
                 OrcamentoItem orcItem = new OrcamentoItem();
@@ -203,9 +211,11 @@ public class OrcamentoService {
 
     @Transactional
     public void excluir(Long id) {
-        if (!repository.existsById(id)) {
-            throw new RecursoNaoEncontradoException("Orçamento não encontrado com ID: " + id);
+        Orcamento orc = buscarPorId(id);
+        if (orc.getStatus() == StatusOrcamento.APROVADO) {
+            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                    "Operação negada: Este orçamento já foi APROVADO e gerou uma Ordem de Serviço. Não é permitido excluí-lo.");
         }
-        repository.deleteById(id);
+        repository.delete(orc);
     }
 }

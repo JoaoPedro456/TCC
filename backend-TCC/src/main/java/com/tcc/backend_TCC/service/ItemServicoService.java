@@ -27,6 +27,12 @@ public class ItemServicoService {
     }
 
     public ItemServico salvar(ItemServico s) {
+        if (s.getNomeServico() != null && !s.getNomeServico().trim().isEmpty()) {
+            repository.findByNomeServicoIgnoreCaseAndAtivoTrue(s.getNomeServico().trim()).ifPresent(existente -> {
+                throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                        "Já existe um serviço ativo cadastrado com o nome '" + s.getNomeServico().trim() + "'.");
+            });
+        }
         return repository.save(s);
     }
 
@@ -35,10 +41,18 @@ public class ItemServicoService {
     }
 
     public ItemServico atualizar(Long id, @Valid ItemServico dados) {
-            ItemServico servico = repository.findById(id)
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
-            servico.setNomeServico(dados.getNomeServico());
-            servico.setPrecoTabela(dados.getPrecoTabela());
-            return repository.save(servico);
+        ItemServico servico = repository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
+        if (dados.getNomeServico() != null && !dados.getNomeServico().trim().isEmpty()) {
+            repository.findByNomeServicoIgnoreCaseAndAtivoTrue(dados.getNomeServico().trim()).ifPresent(existente -> {
+                if (!existente.getId().equals(id)) {
+                    throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                            "Já existe outro serviço ativo cadastrado com o nome '" + dados.getNomeServico().trim() + "'.");
+                }
+            });
+        }
+        servico.setNomeServico(dados.getNomeServico());
+        servico.setPrecoTabela(dados.getPrecoTabela());
+        return repository.save(servico);
     }
 }

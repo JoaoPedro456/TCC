@@ -2,6 +2,13 @@ package com.tcc.backend_TCC.service;
 
 import com.tcc.backend_TCC.model.Pessoa;
 import com.tcc.backend_TCC.enuns.TipoPessoa;
+import com.tcc.backend_TCC.model.OrdemServico;
+import com.tcc.backend_TCC.model.Lancamento;
+import com.tcc.backend_TCC.enuns.StatusOS;
+import com.tcc.backend_TCC.enuns.StatusLancamento;
+import com.tcc.backend_TCC.enuns.TipoLancamento;
+import com.tcc.backend_TCC.repository.OrdemServicoRepository;
+import com.tcc.backend_TCC.repository.LancamentoRepository;
 import com.tcc.backend_TCC.repository.PessoaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -16,6 +23,12 @@ public class PessoaService {
 
     @Autowired
     private PessoaRepository repository;
+
+    @Autowired
+    private OrdemServicoRepository ordemServicoRepository;
+
+    @Autowired
+    private LancamentoRepository lancamentoRepository;
 
     public org.springframework.data.domain.Page<Pessoa> listarTodas(String busca, org.springframework.data.domain.Pageable pageable) {
         if (busca != null && !busca.trim().isEmpty()) {
@@ -110,9 +123,30 @@ public class PessoaService {
     }
 
     public void excluir(Long id) {
-        if (!repository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Pessoa nao encontrada");
+        Pessoa p = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pessoa nao encontrada"));
+
+        // 1. Se for cliente e tiver Ordens de Serviço em aberto
+        List<OrdemServico> ordens = ordemServicoRepository.findByCliente(p);
+        boolean temOsAberta = ordens.stream()
+                .anyMatch(os -> os.getStatus() != StatusOS.CONCLUIDA && os.getStatus() != StatusOS.CANCELADA);
+        if (temOsAberta) {
+            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                    "Operação negada: Não é permitido inativar o cliente '" + p.getNome() + "' pois ele possui Ordem de Serviço em andamento/aberta.");
         }
+
+        // 2. Se for cliente e tiver contas a receber pendentes ou atrasadas no financeiro
+        String nomeNorm = p.getNome() != null ? p.getNome().trim() : "";
+        List<Lancamento> contasAbertas = lancamentoRepository.findByTipoOrderByVencimentoAsc(TipoLancamento.RECEBER)
+                .stream()
+                .filter(l -> l.getStatus() != StatusLancamento.PAGO && l.getEnvolvido() != null && l.getEnvolvido().trim().equalsIgnoreCase(nomeNorm))
+                .toList();
+
+        if (!contasAbertas.isEmpty()) {
+            throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(
+                    "Operação negada: Não é permitido inativar o cliente '" + p.getNome() + "' pois ele possui " + contasAbertas.size() + " conta(s) a receber em aberto no Financeiro.");
+        }
+
         repository.deleteById(id);
     }
 
@@ -159,6 +193,18 @@ public class PessoaService {
             Optional<Pessoa> pessoaExistente = repository.findByTelefoneAndAtivoTrue(pessoa.getTelefone());
             if (pessoaExistente.isPresent() && !pessoaExistente.get().getId().equals(pessoa.getId())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este Telefone já está cadastrado no sistema!");
+            }
+        }
+
+        if ((pessoa.getCpf() == null || pessoa.getCpf().trim().isEmpty()) &&
+            (pessoa.getCnpj() == null || pessoa.getCnpj().trim().isEmpty()) &&
+            pessoa.getNome() != null && !pessoa.getNome().trim().isEmpty() &&
+            pessoa.getTipo() != null) {
+            Optional<Pessoa> pessoaMesmoNome = repository.findByNomeIgnoreCaseAndTipoAndAtivoTrue(pessoa.getNome().trim(), pessoa.getTipo());
+            if (pessoaMesmoNome.isPresent() && !pessoaMesmoNome.get().getId().equals(pessoa.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, 
+                    "Já existe um(a) " + pessoa.getTipo().name().toLowerCase() + " ativo(a) cadastrado(a) com este mesmo nome ('" + pessoa.getNome().trim() + "'). " +
+                    "Para cadastrar pessoas homônimas com o mesmo nome, informe o CPF ou CNPJ.");
             }
         }
     }
