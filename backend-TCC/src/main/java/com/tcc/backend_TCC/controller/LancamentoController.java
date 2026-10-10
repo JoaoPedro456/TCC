@@ -25,7 +25,7 @@ public class LancamentoController {
     public org.springframework.data.domain.Page<Lancamento> listarReceber(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String busca,
-            @org.springframework.data.web.PageableDefault(size = 10, sort = "vencimento", direction = org.springframework.data.domain.Sort.Direction.ASC) org.springframework.data.domain.Pageable pageable) {
+            @org.springframework.data.web.PageableDefault(size = 10, sort = "id", direction = org.springframework.data.domain.Sort.Direction.DESC) org.springframework.data.domain.Pageable pageable) {
         return service.pesquisar(TipoLancamento.RECEBER, status, busca, pageable);
     }
 
@@ -33,7 +33,7 @@ public class LancamentoController {
     public org.springframework.data.domain.Page<Lancamento> listarPagar(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String busca,
-            @org.springframework.data.web.PageableDefault(size = 10, sort = "vencimento", direction = org.springframework.data.domain.Sort.Direction.ASC) org.springframework.data.domain.Pageable pageable) {
+            @org.springframework.data.web.PageableDefault(size = 10, sort = "id", direction = org.springframework.data.domain.Sort.Direction.DESC) org.springframework.data.domain.Pageable pageable) {
         return service.pesquisar(TipoLancamento.PAGAR, status, busca, pageable);
     }
 

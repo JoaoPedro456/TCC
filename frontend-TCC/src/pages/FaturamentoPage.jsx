@@ -1,6 +1,6 @@
 import { formatarMoeda as formatarMoedaUtil } from '../utils/formatters';
 import { useState, useEffect } from 'react';
-import { ArrowUpCircle, ArrowDownCircle, DollarSign, Plus, Clock, AlertCircle, Trash2, X, Search, ChevronLeft, ChevronRight, CheckCircle, BadgePercent, Percent, CheckSquare } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, DollarSign, Plus, Clock, AlertCircle, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle, BadgePercent, Percent, CheckSquare } from 'lucide-react';
 import api from '../services/api';
 import { useToast } from '../components/ToastProvider.jsx';
 
@@ -78,7 +78,8 @@ export function FaturamentoPage() {
         page: paginaAtual - 1,
         size: itensPorPagina,
         busca: busca || undefined,
-        status: filtroStatus !== 'TODOS' ? filtroStatus : undefined
+        status: filtroStatus !== 'TODOS' ? filtroStatus : undefined,
+        sort: 'id,desc'
       };
       
       const endpoint = abaAtiva === 'RECEBER' ? '/financeiro/receber' : '/financeiro/pagar';
@@ -469,6 +470,103 @@ export function FaturamentoPage() {
     }
   };
 
+  // Função para gerar as caixinhas de paginação (até 10 caixinhas visíveis com avanço inteligente)
+  const renderizarBotoesPaginacao = () => {
+    const maxBotoes = 10;
+    let paginas = [];
+
+    if (totalPaginas <= maxBotoes) {
+      paginas = Array.from({ length: totalPaginas }, (_, i) => i + 1);
+    } else {
+      const metade = Math.floor(maxBotoes / 2); // 5
+      let inicio = paginaAtual - metade;
+      let fim = paginaAtual + (maxBotoes - metade - 1);
+
+      if (inicio < 1) {
+        inicio = 1;
+        fim = maxBotoes;
+      } else if (fim > totalPaginas) {
+        fim = totalPaginas;
+        inicio = totalPaginas - maxBotoes + 1;
+      }
+
+      for (let i = inicio; i <= fim; i++) {
+        paginas.push(i);
+      }
+    }
+
+    const primeiroVisivel = paginas[0] || 1;
+    const ultimoVisivel = paginas[paginas.length - 1] || totalPaginas;
+
+    return (
+      <div className="flex items-center gap-1">
+        {/* Ir para primeira página se ela não estiver no grupo visível */}
+        {primeiroVisivel > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setPaginaAtual(1)}
+              className="w-8 h-8 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-white hover:border-slate-300 transition-colors cursor-pointer"
+              title="Primeira página (1)"
+            >
+              1
+            </button>
+            {primeiroVisivel > 2 && (
+              <button
+                type="button"
+                onClick={() => setPaginaAtual(Math.max(1, primeiroVisivel - maxBotoes))}
+                className="w-8 h-8 rounded-lg text-xs font-bold text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors flex items-center justify-center cursor-pointer"
+                title={`Voltar ${maxBotoes} páginas`}
+              >
+                ...
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Caixinhas das páginas (até 10 caixinhas) */}
+        {paginas.map(numeroDaPagina => (
+          <button
+            key={numeroDaPagina}
+            type="button"
+            onClick={() => setPaginaAtual(numeroDaPagina)}
+            className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              paginaAtual === numeroDaPagina 
+                ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/30' 
+                : 'border border-slate-200 text-slate-600 hover:bg-white hover:border-slate-400'
+            }`}
+          >
+            {numeroDaPagina}
+          </button>
+        ))}
+
+        {/* Ir para última página se ela não estiver no grupo visível */}
+        {ultimoVisivel < totalPaginas && (
+          <>
+            {ultimoVisivel < totalPaginas - 1 && (
+              <button
+                type="button"
+                onClick={() => setPaginaAtual(Math.min(totalPaginas, ultimoVisivel + maxBotoes))}
+                className="w-8 h-8 rounded-lg text-xs font-bold text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors flex items-center justify-center cursor-pointer"
+                title={`Avançar ${maxBotoes} páginas`}
+              >
+                ...
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setPaginaAtual(totalPaginas)}
+              className="w-8 h-8 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-white hover:border-slate-300 transition-colors cursor-pointer"
+              title={`Última página (${totalPaginas})`}
+            >
+              {totalPaginas}
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
   // ==========================================
 
   return (
@@ -728,39 +826,49 @@ export function FaturamentoPage() {
 
         {/* --- CONTROLES DE PAGINAÇÃO --- */}
         {!loading && totalPaginas > 1 && (
-          <div className="flex items-center justify-between p-4 border-t border-slate-100 bg-slate-50">
-            <p className="text-sm text-slate-500">
-              Mostrando <span className="font-semibold text-slate-900">{contasPaginadas.length > 0 ? indexPrimeiroItem + 1 : 0}</span> a <span className="font-semibold text-slate-900">{indexUltimoItem}</span> de <span className="font-semibold text-slate-900">{totalElementos}</span> registros
+          <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-slate-100 bg-slate-50 gap-3">
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">
+              Mostrando <span className="font-bold text-slate-900">{contasPaginadas.length > 0 ? indexPrimeiroItem + 1 : 0}</span> a <span className="font-bold text-slate-900">{indexUltimoItem}</span> de <span className="font-bold text-slate-900">{totalElementos}</span> registros
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-center">
               <button 
+                type="button"
+                onClick={() => setPaginaAtual(1)}
+                disabled={paginaAtual === 1}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                title="Primeira página"
+              >
+                <ChevronsLeft size={16} />
+              </button>
+              <button 
+                type="button"
                 onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
                 disabled={paginaAtual === 1}
-                className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                title="Página anterior"
               >
                 <ChevronLeft size={16} />
               </button>
-              <div className="flex gap-1">
-                {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(numeroDaPagina => (
-                  <button
-                    key={numeroDaPagina}
-                    onClick={() => setPaginaAtual(numeroDaPagina)}
-                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                      paginaAtual === numeroDaPagina 
-                        ? 'bg-blue-600 text-white' 
-                        : 'border border-slate-200 text-slate-600 hover:bg-white'
-                    }`}
-                  >
-                    {numeroDaPagina}
-                  </button>
-                ))}
-              </div>
+              
+              {renderizarBotoesPaginacao()}
+
               <button 
+                type="button"
                 onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
                 disabled={paginaAtual === totalPaginas}
-                className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                title="Próxima página"
               >
                 <ChevronRight size={16} />
+              </button>
+              <button 
+                type="button"
+                onClick={() => setPaginaAtual(totalPaginas)}
+                disabled={paginaAtual === totalPaginas}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                title="Última página"
+              >
+                <ChevronsRight size={16} />
               </button>
             </div>
           </div>
