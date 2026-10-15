@@ -4,8 +4,10 @@ import api from '../services/api';
 import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search, ChevronLeft, ChevronRight, Edit2, Play } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
 import { AutocompleteSelect } from '../components/AutocompleteSelect.jsx';
+import { usuarioEhAdmin } from '../utils/token';
 
 export function OrcamentoPage() {
+  const isAdmin = usuarioEhAdmin();
   const [orcamentos, setOrcamentos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [servicos, setServicos] = useState([]);
@@ -564,14 +566,16 @@ export function OrcamentoPage() {
                         <Edit2 size={14} />
                       </button>
                     )}
-                    {orc.status === 'APROVADO' ? (
-                      <span className="text-slate-200 p-1.5 cursor-not-allowed inline-block" title="Orçamentos já aprovados não podem ser excluídos">
-                        <Trash2 size={14} className="opacity-30" />
-                      </span>
-                    ) : (
-                      <button type="button" onClick={() => excluir(orc.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition cursor-pointer" title="Excluir Orçamento">
-                        <Trash2 size={14} />
-                      </button>
+                    {isAdmin && (
+                      orc.status === 'APROVADO' ? (
+                        <span className="text-slate-200 p-1.5 cursor-not-allowed inline-block" title="Orçamentos já aprovados não podem ser excluídos">
+                          <Trash2 size={14} className="opacity-30" />
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => excluir(orc.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition cursor-pointer" title="Excluir Orçamento">
+                          <Trash2 size={14} />
+                        </button>
+                      )
                     )}
                   </div>
                 </div>

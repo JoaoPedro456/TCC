@@ -24,10 +24,12 @@ dist-ssr
 *.sw?
 
 # Ambiente / Variáveis Locais
-.env              ← Local com localhost (NÃO SUBIR)
+# .env = local com localhost (NÃO SUBIR). O .gitignore não aceita comentário na mesma linha.
+.env
 .env.local
 .env.*.local
 .env-prod
+.env.*
 
 # Frontend
 node_modules/

@@ -27,7 +27,23 @@ jobs:
           
           docker run --rm postgres:17 pg_dump "$SUPABASE_DB_URL" --clean --if-exists --no-owner --no-privileges > backup_tcc_${{ env.TIMESTAMP }}.sql
           
-          echo "Backup concluído com sucesso."
+          echo "Backup extraído com sucesso."
+
+      - name: Criptografar Backup com AES-256 (GPG)
+        env:
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+        run: |
+          if [ -z "$BACKUP_ENCRYPTION_PASSPHRASE" ]; then
+            echo "::error::A Secret BACKUP_ENCRYPTION_PASSPHRASE não foi configurada no repositório! O backup NÃO será enviado sem criptografia para proteger os dados pessoais (LGPD)."
+            exit 1
+          fi
+          
+          echo "Criptografando o dump do banco com AES-256..."
+          gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$BACKUP_ENCRYPTION_PASSPHRASE" \
+              -o backup_tcc_${{ env.TIMESTAMP }}.sql.gpg backup_tcc_${{ env.TIMESTAMP }}.sql
+          
+          rm -f backup_tcc_${{ env.TIMESTAMP }}.sql
+          echo "Backup criptografado com sucesso (backup_tcc_${{ env.TIMESTAMP }}.sql.gpg)."
 
       - name: Enviar para Repositório de Backup Privado
         env:
@@ -38,13 +54,13 @@ jobs:
           echo "Clonando repositório de backups privado..."
           git clone https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/${BACKUP_REPO}.git backup-repo
           
-          echo "Movendo o arquivo de backup..."
-          mv backup_tcc_${{ env.TIMESTAMP }}.sql backup-repo/
+          echo "Movendo o arquivo de backup criptografado..."
+          mv backup_tcc_${{ env.TIMESTAMP }}.sql.gpg backup-repo/
           
           echo "Configurando git e enviando as alterações..."
           cd backup-repo
           git config user.name "GitHub Actions Backup Bot"
           git config user.email "actions@github.com"
-          git add backup_tcc_${{ env.TIMESTAMP }}.sql
-          git commit -m "Backup automático: ${{ env.TIMESTAMP }}"
+          git add backup_tcc_${{ env.TIMESTAMP }}.sql.gpg
+          git commit -m "Backup automático criptografado: ${{ env.TIMESTAMP }}"
           git push origin main

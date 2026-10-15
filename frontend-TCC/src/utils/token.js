@@ -36,8 +36,42 @@ export function limparTokenSeExpirado() {
  * Retorna os segundos restantes até a expiração do token.
  */
 export function tempoRestante(token) {
-  const payload = decodificarPayload(token);
+  const payload = decodificarPayload(token || localStorage.getItem('token'));
   if (!payload || !payload.exp) return 0;
   const restante = Math.floor((payload.exp * 1000 - Date.now()) / 1000);
   return restante > 0 ? restante : 0;
+}
+
+/**
+ * Retorna o payload completo decodificado do token atual ou fornecido.
+ */
+export function obterPayload(token) {
+  const t = token || localStorage.getItem('token');
+  if (!t) return null;
+  return decodificarPayload(t);
+}
+
+/**
+ * Retorna a role do usuário (ex: 'ADMIN', 'OPERADOR').
+ */
+export function obterRole(token) {
+  const payload = obterPayload(token);
+  if (!payload?.role) return null;
+  return String(payload.role).toUpperCase();
+}
+
+/**
+ * Retorna true se o usuário logado tiver papel de Administrador.
+ */
+export function usuarioEhAdmin(token) {
+  const role = obterRole(token);
+  return role === 'ADMIN' || role === 'ROLE_ADMIN';
+}
+
+/**
+ * Retorna o login/identificador do usuário logado.
+ */
+export function obterLoginUsuario(token) {
+  const payload = obterPayload(token);
+  return payload?.sub || null;
 }

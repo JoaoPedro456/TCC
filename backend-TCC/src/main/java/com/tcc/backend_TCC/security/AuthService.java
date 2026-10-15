@@ -20,10 +20,20 @@ public class AuthService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    public String login(String login, String senha) {
-        Usuario usuario = usuarioRepository.findByLogin(login)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+    // Dummy hash para mitigar enumeração de usuários por medição de tempo (Timing Attack)
+    private static final String DUMMY_HASH = "$2a$12$e8y0JkC5.V8r5h54Fz4kIekvjC47k9bX3a4sO6hZqE9yH8e0l3F8i";
 
+    public String login(String login, String senha) {
+        java.util.Optional<Usuario> optUsuario = usuarioRepository.findByLogin(login);
+        if (optUsuario.isEmpty()) {
+            // Executa verificação dummy para manter o tempo de resposta equivalente ao de usuário existente
+            try {
+                passwordEncoder.matches(senha, DUMMY_HASH);
+            } catch (Exception ignored) {}
+            throw new RecursoNaoEncontradoException("Usuário não encontrado");
+        }
+
+        Usuario usuario = optUsuario.get();
         if (!passwordEncoder.matches(senha, usuario.getSenha())) {
             throw new OperacaoInvalidaException("Senha incorreta");
         }
@@ -32,13 +42,19 @@ public class AuthService {
     }
 
     public Usuario registrar(String login, String senha, String role) {
-        if (usuarioRepository.findByLogin(login).isPresent()) {
+        if (login == null || login.trim().length() < 3 || login.trim().length() > 50) {
+            throw new OperacaoInvalidaException("Login deve ter entre 3 e 50 caracteres");
+        }
+        if (senha == null || senha.length() < 6) {
+            throw new OperacaoInvalidaException("Senha deve ter no mínimo 6 caracteres");
+        }
+        if (usuarioRepository.findByLogin(login.trim()).isPresent()) {
             throw new OperacaoInvalidaException("Login já existe");
         }
         Usuario u = new Usuario();
-        u.setLogin(login);
+        u.setLogin(login.trim());
         u.setSenha(passwordEncoder.encode(senha));
-        u.setRole(role != null ? role : "OPERADOR");
+        u.setRole(role != null ? role.trim().toUpperCase() : "OPERADOR");
         return usuarioRepository.save(u);
     }
 

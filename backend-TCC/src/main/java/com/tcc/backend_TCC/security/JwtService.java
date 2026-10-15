@@ -15,6 +15,15 @@ public class JwtService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtService.class);
 
+    /**
+     * Segredos que já foram commitados no repositório público (histórico git).
+     * Qualquer pessoa pode forjar tokens com eles, então a aplicação se recusa a subir.
+     */
+    private static final java.util.Set<String> SEGREDOS_VAZADOS = java.util.Set.of(
+            "bazani-mecanica-tcc-2026-secret-key-min-256-bits-required",
+            "dev-only-secret-key-do-not-use-in-production-bazani-2026"
+    );
+
     private final String SECRET;
     private final long EXPIRACAO;
 
@@ -26,6 +35,14 @@ public class JwtService {
         }
         if (this.SECRET.length() < 32) {
             throw new IllegalStateException("JWT_SECRET muito curto! Mínimo de 32 caracteres.");
+        }
+        if (SEGREDOS_VAZADOS.contains(this.SECRET.trim())) {
+            throw new IllegalStateException(
+                    "JWT_SECRET comprometido! Este valor está no histórico público do repositório. " +
+                    "Gere um novo segredo aleatório (ex.: openssl rand -base64 64).");
+        }
+        if (this.SECRET.chars().distinct().count() < 10) {
+            throw new IllegalStateException("JWT_SECRET com baixa entropia! Use um valor aleatório.");
         }
         String expStr = env.getProperty("jwt.expiration", "39600000");
         this.EXPIRACAO = Long.parseLong(expStr);

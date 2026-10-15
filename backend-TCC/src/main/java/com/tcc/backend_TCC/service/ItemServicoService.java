@@ -27,6 +27,8 @@ public class ItemServicoService {
     }
 
     public ItemServico salvar(ItemServico s) {
+        s.setId(null);
+        s.setAtivo(true);
         if (s.getNomeServico() != null && !s.getNomeServico().trim().isEmpty()) {
             repository.findByNomeServicoIgnoreCaseAndAtivoTrue(s.getNomeServico().trim()).ifPresent(existente -> {
                 throw new com.tcc.backend_TCC.exception.OperacaoInvalidaException(

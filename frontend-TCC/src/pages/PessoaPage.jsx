@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { UserPlus, Trash2, X, Search, PenIcon } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
+import { usuarioEhAdmin } from '../utils/token';
 
 export function PessoaPage() {
+  const isAdmin = usuarioEhAdmin();
   const [pessoas, setPessoas] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [idEdicao, setIdEdicao] = useState(null);
@@ -373,12 +375,15 @@ export function PessoaPage() {
                   >
                     <PenIcon size={16} />
                   </button>
-                  <button
-                    onClick={() => handleExcluir(p.id)}
-                    className="text-slate-300 hover:text-red-500 transition"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleExcluir(p.id)}
+                      className="text-slate-300 hover:text-red-500 transition"
+                      title="Excluir cadastro"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

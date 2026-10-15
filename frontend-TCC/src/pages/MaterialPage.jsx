@@ -3,8 +3,10 @@ import { formatarMoeda } from '../utils/formatters';
 import api from '../services/api';
 import { Plus, Trash2, X, Search, PenIcon, PackageOpen } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
+import { usuarioEhAdmin } from '../utils/token';
 
 export function MaterialPage() {
+  const isAdmin = usuarioEhAdmin();
   const [materiais, setMateriais] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [idEdicao, setIdEdicao] = useState(null); 
@@ -164,12 +166,15 @@ export function MaterialPage() {
               >
                 <PenIcon size={16} />
               </button>
-              <button
-                onClick={() => handleExcluir(m.id)}
-                className="text-slate-300 hover:text-red-500 transition p-2 rounded-lg hover:bg-red-50"
-              >
-                <Trash2 size={16} />
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => handleExcluir(m.id)}
+                  className="text-slate-300 hover:text-red-500 transition p-2 rounded-lg hover:bg-red-50"
+                  title="Excluir material"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
           </div>
         ))}

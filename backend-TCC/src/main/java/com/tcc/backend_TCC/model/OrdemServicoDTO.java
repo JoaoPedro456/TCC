@@ -37,12 +37,15 @@ public class OrdemServicoDTO {
     @DecimalMin(value = "0.0", message = "Valor total não pode ser negativo")
     private BigDecimal valorTotal;
 
-    private List<OrdemServicoItemDTO> itensServico;
+    @Valid
+    private List<@Valid OrdemServicoItemDTO> itensServico;
 
-    private List<OrdemServicoMaterialDTO> materiais;
+    @Valid
+    private List<@Valid OrdemServicoMaterialDTO> materiais;
 
     @NotEmpty(message = "É necessário associar pelo menos um mecânico")
-    private List<MecanicoDTO> mecanicos;
+    @Valid
+    private List<@Valid MecanicoDTO> mecanicos;
 
     @Data
     public static class ClienteDTO {

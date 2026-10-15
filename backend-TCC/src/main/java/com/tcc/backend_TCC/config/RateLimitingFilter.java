@@ -30,7 +30,7 @@ public class RateLimitingFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
-        String clientIp = getClientIp(httpRequest);
+        String clientIp = com.tcc.backend_TCC.security.IpUtil.getClientIp(httpRequest);
         String requestUri = httpRequest.getRequestURI();
         String method = httpRequest.getMethod();
 
@@ -71,22 +71,5 @@ public class RateLimitingFilter implements Filter {
         }
 
         chain.doFilter(request, response);
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        String ip;
-
-        if (xfHeader != null) {
-            ip = xfHeader.split(",")[0].trim();
-        } else {
-            ip = request.getRemoteAddr();
-        }
-
-        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
-            return "127.0.0.1";
-        }
-
-        return ip;
     }
 }

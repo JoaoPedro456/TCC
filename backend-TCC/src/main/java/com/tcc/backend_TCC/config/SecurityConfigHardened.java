@@ -29,6 +29,7 @@ import java.util.List;
  */
 @Configuration
 @EnableWebSecurity
+@org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 public class SecurityConfigHardened {
 
     @Autowired
@@ -58,30 +59,28 @@ public class SecurityConfigHardened {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Public endpoints
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
+
+                // Admin endpoints - restrito apenas para ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/auth/registrar").hasRole("ADMIN")
-                .requestMatchers("/api/health").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/financeiro/**").hasRole("ADMIN")
+                .requestMatchers("/api/relatorios/**").hasRole("ADMIN")
 
-                // Admin endpoints - restricted
-                .requestMatchers(HttpMethod.POST, "/api/admin/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/admin/**").hasRole("ADMIN")
+                // Exclusões de registros sensíveis - restrito apenas para ADMIN
+                .requestMatchers(HttpMethod.DELETE, "/api/pessoa/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/ordens/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/orcamentos/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/materiais/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/servico/**").hasRole("ADMIN")
 
-                // H2 Console - only in dev (or consider removing completely)
-                .requestMatchers("/h2-console/**").permitAll()
-
-                // Financeiro - authenticated
-                .requestMatchers("/api/financeiro/**").authenticated()
-
-                // Pessoa - authenticated
+                // Operações do dia a dia - OPERADOR ou ADMIN autenticados
                 .requestMatchers("/api/pessoa/**").authenticated()
-
-                // Ordens - authenticated
                 .requestMatchers("/api/ordens/**").authenticated()
-
-                // Serviços - authenticated
+                .requestMatchers("/api/orcamentos/**").authenticated()
+                .requestMatchers("/api/materiais/**").authenticated()
                 .requestMatchers("/api/servico/**").authenticated()
-
-                // Relatórios - authenticated
-                .requestMatchers("/api/relatorios/**").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/auth/alterar-senha").authenticated()
 
                 // Qualquer outra requisição - requer autenticação
                 .anyRequest().authenticated()
@@ -135,8 +134,12 @@ public class SecurityConfigHardened {
                     .collect(java.util.stream.Collectors.toList());
             configuration.setAllowedOrigins(origins);
         } else {
-            // Fallback para desenvolvimento local
-            configuration.setAllowedOriginPatterns(java.util.List.of("http://localhost:*", "http://127.0.0.1:*"));
+            // Fallback seguro incluindo localhost e o frontend Vercel padrão
+            configuration.setAllowedOriginPatterns(java.util.List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "https://front-tcc-pi.vercel.app"
+            ));
         }
         configuration.setAllowedMethods(List.of(
             "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"

@@ -4,6 +4,7 @@ import api from '../services/api';
 import { Plus, X, Trash2, ClipboardList, CheckCircle, Clock, XCircle, Printer, Search, ChevronLeft, ChevronRight, Edit2, FileText, Download, CheckSquare, Square, Calendar, BadgePercent, Percent, Wrench, Package } from 'lucide-react';
 import { useToast } from '../components/ToastProvider.jsx';
 import { AutocompleteSelect } from '../components/AutocompleteSelect.jsx';
+import { usuarioEhAdmin } from '../utils/token';
 
 const STATUS_CONFIG = {
   ABERTA: { label: 'Aberta', color: 'bg-blue-500/20 text-blue-400 border border-blue-500/30', icon: <Clock size={12} /> },
@@ -20,6 +21,7 @@ const FORMAS_PAGAMENTO = [
 ];
 
 export function OrdemServicoPage() {
+  const isAdmin = usuarioEhAdmin();
   const [ordens, setOrdens] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
@@ -894,9 +896,11 @@ export function OrdemServicoPage() {
                     <button type="button" onClick={() => abrirEditar(os)} className="text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-md p-1.5 transition" title="Editar OS">
                       <Edit2 size={14} />
                     </button>
-                    <button type="button" onClick={() => excluir(os.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition">
-                      <Trash2 size={14} />
-                    </button>
+                    {isAdmin && (
+                      <button type="button" onClick={() => excluir(os.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md p-1.5 transition" title="Excluir OS">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

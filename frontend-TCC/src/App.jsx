@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from './components/ToastProvider';
-import { limparTokenSeExpirado } from './utils/token';
+import { limparTokenSeExpirado, usuarioEhAdmin } from './utils/token';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { OrcamentoPage } from './pages/OrcamentoPage';
@@ -13,6 +13,14 @@ import { FaturamentoPage } from './pages/FaturamentoPage';
 import { ComissaoPage } from './pages/ComissaoPage';
 import { RelatorioPage } from './pages/RelatorioPage';
 import { Sidebar } from './components/Sidebar';
+
+function RotaAdmin({ children }) {
+  const isAdmin = usuarioEhAdmin();
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
 
 function AppLayout() {
   return (
@@ -27,9 +35,9 @@ function AppLayout() {
             <Route path="/pessoas" element={<PessoaPage />} />
             <Route path="/catalogo" element={<ServicoPage />} />
             <Route path="/materiais" element={<MaterialPage />} />
-            <Route path="/faturamento" element={<FaturamentoPage />} />
-            <Route path="/comissoes" element={<ComissaoPage />} />
-            <Route path="/relatorios" element={<RelatorioPage />} />
+            <Route path="/faturamento" element={<RotaAdmin><FaturamentoPage /></RotaAdmin>} />
+            <Route path="/comissoes" element={<RotaAdmin><ComissaoPage /></RotaAdmin>} />
+            <Route path="/relatorios" element={<RotaAdmin><RelatorioPage /></RotaAdmin>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

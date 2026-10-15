@@ -73,7 +73,7 @@ public class OrdemServicoController {
 
     @PutMapping("/status-lote")
     public ResponseEntity<Void> atualizarStatusEmLote(
-            @RequestBody List<Long> ids,
+            @RequestBody @jakarta.validation.constraints.NotEmpty @jakarta.validation.constraints.Size(max = 100, message = "Máximo de 100 OS por lote") List<Long> ids,
             @RequestParam @NotBlank(message = "Status é obrigatório") String status) {
         service.atualizarStatusEmLote(ids, status);
         return ResponseEntity.noContent().build();
@@ -104,7 +104,7 @@ public class OrdemServicoController {
     }
 
     @PostMapping("/pdf-lote")
-    public ResponseEntity<byte[]> gerarPdfLote(@RequestBody List<Long> ids) throws Exception {
+    public ResponseEntity<byte[]> gerarPdfLote(@RequestBody @jakarta.validation.constraints.NotEmpty @jakarta.validation.constraints.Size(max = 100, message = "Máximo de 100 OS por lote") List<Long> ids) throws Exception {
         byte[] pdf = impressaoService.gerarPdfMultiplasOs(ids);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=OS_Notas_Selecionadas.pdf")
@@ -128,7 +128,7 @@ public class OrdemServicoController {
     }
 
     @PutMapping("/baixa-lote")
-    public ResponseEntity<Void> darBaixaEmLote(@RequestBody BaixaLoteDTO dto) {
+    public ResponseEntity<Void> darBaixaEmLote(@Valid @RequestBody BaixaLoteDTO dto) {
         service.darBaixaEmLote(dto);
         return ResponseEntity.noContent().build();
     }

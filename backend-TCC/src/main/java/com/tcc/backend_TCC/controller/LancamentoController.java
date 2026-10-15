@@ -16,6 +16,7 @@ import com.tcc.backend_TCC.model.BaixaLoteDTO;
 
 @RestController
 @RequestMapping("/api/financeiro")
+@org.springframework.validation.annotation.Validated
 public class LancamentoController {
 
     @Autowired
@@ -50,18 +51,20 @@ public class LancamentoController {
     @PutMapping("/{id}/baixa")
     public Lancamento darBaixa(
             @PathVariable Long id,
-            @RequestBody(required = false) BaixaLancamentoDTO dto) {
+            @Valid @RequestBody(required = false) BaixaLancamentoDTO dto) {
         return service.darBaixa(id, dto);
     }
 
     @PutMapping("/status-lote")
-    public ResponseEntity<Void> atualizarStatusEmLote(@RequestBody List<Long> ids, @RequestParam String status) {
+    public ResponseEntity<Void> atualizarStatusEmLote(
+            @RequestBody @jakarta.validation.constraints.NotEmpty @jakarta.validation.constraints.Size(max = 100, message = "Máximo de 100 itens por lote") List<Long> ids,
+            @RequestParam String status) {
         service.atualizarStatusEmLote(ids, status);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/baixa-lote")
-    public ResponseEntity<Void> darBaixaEmLote(@RequestBody BaixaLoteDTO dto) {
+    public ResponseEntity<Void> darBaixaEmLote(@Valid @RequestBody BaixaLoteDTO dto) {
         service.darBaixaEmLoteComDesconto(dto);
         return ResponseEntity.noContent().build();
     }

@@ -36,7 +36,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body,
                                    HttpServletRequest request) {
-        String clientIp = getClientIp(request);
+        String clientIp = com.tcc.backend_TCC.security.IpUtil.getClientIp(request);
         log.info("Requisicao de login recebida. IP: {}", clientIp);
 
         String login = body.get("login");
@@ -46,10 +46,12 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Login e senha sao obrigatorios"));
         }
 
+        String safeLogin = com.tcc.backend_TCC.security.IpUtil.sanitizeForLog(login);
+
         // --- Rate Limiting para Login (Anti-Brute-Force) ---
         if (!rateLimitingService.isLoginAllowed(clientIp, login)) {
             long retryAfter = rateLimitingService.getLoginRetryAfterSeconds(clientIp, login);
-            log.warn("LOGIN BLOQUEADO! IP: {}, Login: {}", clientIp, login);
+            log.warn("LOGIN BLOQUEADO! IP: {}, Login: {}", clientIp, safeLogin);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .header("Retry-After", String.valueOf(retryAfter))
                     .body(Map.of(
@@ -61,12 +63,12 @@ public class AuthController {
         try {
             String token = authService.login(login, senha);
             rateLimitingService.resetLoginAttempts(clientIp, login);
-            log.info("Login bem-sucedido para: {}", login);
+            log.info("Login bem-sucedido para: {}", safeLogin);
             return ResponseEntity.ok(Map.of("token", token));
         } catch (Exception e) {
             // Registra a tentativa malsucedida para computar nos buckets/testes
             rateLimitingService.registerFailedAttempt(clientIp, login);
-            log.warn("Login falhou para: {} - {}", login, e.getMessage());
+            log.warn("Login falhou para: {} - {}", safeLogin, e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", "Login ou senha incorretos"));
         }
     }
@@ -81,12 +83,16 @@ public class AuthController {
             return ResponseEntity.badRequest().build();
         }
 
+        if (senha.length() < 6) {
+            return ResponseEntity.badRequest().build();
+        }
+
         // Validar role permitida
         if (!"ADMIN".equals(role) && !"OPERADOR".equals(role)) {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Novo usuario registrado: {} com role: {}", login, role);
+        log.info("Novo usuario registrado: {} com role: {}", com.tcc.backend_TCC.security.IpUtil.sanitizeForLog(login), role);
         Usuario usuario = authService.registrar(login, senha, role);
         return ResponseEntity.status(HttpStatus.CREATED).body(usuario);
     }
@@ -98,6 +104,12 @@ public class AuthController {
     @PutMapping("/alterar-senha")
     public ResponseEntity<?> alterarSenha(@RequestBody Map<String, String> body,
                                           HttpServletRequest request) {
+        String clientIp = com.tcc.backend_TCC.security.IpUtil.getClientIp(request);
+        if (!rateLimitingService.isAllowed(clientIp + ":alterar-senha", 20)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Muitas tentativas de alteração de senha. Aguarde 1 minuto."));
+        }
+
         String senhaAtual = body.get("senhaAtual");
         String novaSenha = body.get("novaSenha");
 
@@ -128,15 +140,7 @@ public class AuthController {
         usuario.setSenha(passwordEncoder.encode(novaSenha));
         usuarioRepository.save(usuario);
 
-        log.info("Senha alterada para o usuario: {}", login);
+        log.info("Senha alterada para o usuario: {}", com.tcc.backend_TCC.security.IpUtil.sanitizeForLog(login));
         return ResponseEntity.ok(Map.of("message", "Senha alterada com sucesso"));
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader == null) {
-            return request.getRemoteAddr();
-        }
-        return xfHeader.split(",")[0].trim();
     }
 }

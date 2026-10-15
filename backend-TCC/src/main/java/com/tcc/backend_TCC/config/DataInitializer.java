@@ -21,6 +21,9 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private org.springframework.core.env.Environment environment;
+
     @Value("${admin.default-password:#{null}}")
     private String defaultAdminPassword;
 
@@ -36,9 +39,13 @@ public class DataInitializer implements CommandLineRunner {
         if (usuarioRepository.count() == 0) {
             String senha = defaultAdminPassword;
             if (senha == null || senha.trim().isEmpty()) {
-                senha = java.util.UUID.randomUUID().toString().substring(0, 8);
-                log.warn("Nenhuma senha padrao fornecida via variavel de ambiente.");
-                log.warn("Senha gerada aleatoriamente para o primeiro acesso: " + senha);
+                senha = java.util.UUID.randomUUID().toString().substring(0, 10);
+                if (environment != null && environment.matchesProfiles("dev")) {
+                    log.warn("Nenhuma senha padrao fornecida via variavel de ambiente.");
+                    log.warn("Senha gerada aleatoriamente para o primeiro acesso (dev): {}", senha);
+                } else {
+                    log.warn("Admin inicial criado com senha gerada. Configure ADMIN_DEFAULT_PASSWORD no servidor.");
+                }
             }
             
             Usuario admin = new Usuario();

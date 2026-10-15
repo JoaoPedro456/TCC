@@ -21,6 +21,9 @@ public class JwtFilter extends OncePerRequestFilter {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private com.tcc.backend_TCC.repository.UsuarioRepository usuarioRepository;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -34,7 +37,22 @@ public class JwtFilter extends OncePerRequestFilter {
             if (jwtService.tokenValido(token)) {
                 String login = jwtService.extrairLogin(token);
                 String role = jwtService.extrairRole(token);
-// Se no banco estiver "ADMIN", aqui vira "ROLE_ADMIN"
+
+                // Verifica se usuário existe no banco e se ainda está ativo
+                var optUsuario = usuarioRepository.findByLogin(login);
+                if (optUsuario.isPresent()) {
+                    if (Boolean.FALSE.equals(optUsuario.get().getAtivo())) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\": \"Usuário inativo ou desativado\"}");
+                        return;
+                    }
+                    if (optUsuario.get().getRole() != null) {
+                        role = optUsuario.get().getRole();
+                    }
+                }
+
+                // Se no banco estiver "ADMIN", aqui vira "ROLE_ADMIN"
                 String authority = "ROLE_" + (role != null ? role.toUpperCase() : "OPERADOR");
                 List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(authority));
 

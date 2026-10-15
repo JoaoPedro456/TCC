@@ -18,9 +18,11 @@ import org.hibernate.annotations.SQLRestriction;
 public class Pessoa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
     private Long id;
 
     @Column(nullable = false, columnDefinition = "boolean default true")
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
     private Boolean ativo = true;
 
     @NotBlank(message = "Nome é obrigatório")

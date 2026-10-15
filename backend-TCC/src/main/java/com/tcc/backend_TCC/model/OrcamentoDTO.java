@@ -31,9 +31,11 @@ public class OrcamentoDTO {
     @DecimalMin(value = "0.0", message = "Valor total não pode ser negativo")
     private BigDecimal valorTotal;
 
-    private List<OrcamentoItemDTO> itensServico;
+    @Valid
+    private List<@Valid OrcamentoItemDTO> itensServico;
 
-    private List<OrcamentoMaterialDTO> materiais;
+    @Valid
+    private List<@Valid OrcamentoMaterialDTO> materiais;
 
     @Data
     public static class ClienteDTO {

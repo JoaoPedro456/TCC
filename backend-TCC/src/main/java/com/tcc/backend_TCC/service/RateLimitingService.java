@@ -23,6 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class RateLimitingService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RateLimitingService.class);
+
     @Autowired
     private RateLimitLogRepository logRepository;
 
@@ -34,9 +36,13 @@ public class RateLimitingService {
     private final Map<String, Bucket> loginIpBuckets = new ConcurrentHashMap<>();
     private final Map<String, Long> loginIpCreationTime = new ConcurrentHashMap<>();
 
-    // Buckets específicos para LOGIN (por usuário - anti-brute-force)
+    // Buckets específicos para LOGIN (por combinação IP:usuário - anti-brute-force sem lock global)
     private final Map<String, Bucket> loginUserBuckets = new ConcurrentHashMap<>();
     private final Map<String, Long> loginUserCreationTime = new ConcurrentHashMap<>();
+
+    // Debounce para não inundar o PostgreSQL caso sofra ataque massivo
+    private final Map<String, Long> lastLoggedTime = new ConcurrentHashMap<>();
+    private static final int MAX_MAP_ENTRIES = 5000;
 
     // Campos para compatibilidade com testes e lógica de bloqueio legada
     private final Map<String, Integer> ipAttempts = new ConcurrentHashMap<>();
@@ -45,6 +51,16 @@ public class RateLimitingService {
 
     // Configurações de tempo (em milissegundos)
     private static final long BUCKET_EXPIRY_MS = Duration.ofHours(1).toMillis();
+
+    private void enforceMemorySafety() {
+        if (buckets.size() > MAX_MAP_ENTRIES || loginIpBuckets.size() > MAX_MAP_ENTRIES || loginUserBuckets.size() > MAX_MAP_ENTRIES) {
+            cleanupExpiredBuckets();
+            if (buckets.size() > MAX_MAP_ENTRIES) buckets.clear();
+            if (loginIpBuckets.size() > MAX_MAP_ENTRIES) loginIpBuckets.clear();
+            if (loginUserBuckets.size() > MAX_MAP_ENTRIES) loginUserBuckets.clear();
+            if (lastLoggedTime.size() > MAX_MAP_ENTRIES) lastLoggedTime.clear();
+        }
+    }
 
     /**
      * Bucket padrão: 100 requisições por minuto (API geral)
@@ -81,6 +97,7 @@ public class RateLimitingService {
      * Verifica se o IP pode fazer uma requisão (API geral).
      */
     public boolean isAllowed(String ipAddress) {
+        enforceMemorySafety();
         Bucket bucket = buckets.computeIfAbsent(ipAddress, k -> {
             bucketCreationTime.put(k, System.currentTimeMillis());
             return createNewBucket();
@@ -97,9 +114,10 @@ public class RateLimitingService {
      * @return true se permitido, false se excedeu limite
      */
     public boolean isLoginAllowed(String ipAddress, String username) {
+        enforceMemorySafety();
         String blockReason = null;
 
-        // Verifica limite por IP (10 tentativas/15min)
+        // 1. Verifica limite por IP (10 tentativas/15min)
         Bucket ipBucket = loginIpBuckets.computeIfAbsent(ipAddress, k -> {
             loginIpCreationTime.put(k, System.currentTimeMillis());
             return createLoginIpBucket();
@@ -109,10 +127,12 @@ public class RateLimitingService {
             blockReason = "LOGIN_IP";
         }
 
-        // Verifica limite por usuário (5 tentativas/15min)
+        // 2. Verifica limite por usuário associado ao IP (5 tentativas/15min)
+        // Usar ipAddress + ":" + username previne que um atacante em outro IP bloqueie o usuário legítimo
         if (blockReason == null && username != null && !username.isBlank()) {
+            String userKey = (ipAddress != null ? ipAddress.trim() : "") + ":" + username.toLowerCase().trim();
             Bucket userBucket = loginUserBuckets.computeIfAbsent(
-                    username.toLowerCase().trim(),
+                    userKey,
                     k -> {
                         loginUserCreationTime.put(k, System.currentTimeMillis());
                         return createLoginUserBucket();
@@ -123,18 +143,22 @@ public class RateLimitingService {
             }
         }
 
-        // Se foi bloqueado, registra no PostgreSQL para auditoria de forma ASSÍNCRONA
-        // Isso evita que um ataque de força bruta bloqueie as threads do Tomcat aguardando o banco.
+        // Se foi bloqueado, registra no PostgreSQL com debounce de 5 min para evitar DoS no banco
         if (blockReason != null) {
-            final String finalBlockReason = blockReason;
-            java.util.concurrent.CompletableFuture.runAsync(() -> {
-                try {
-                    logRepository.save(new RateLimitLog(ipAddress, username, finalBlockReason));
-                    System.out.println("[RateLimit] LOG SALVO NO BANCO COM SUCESSO! (Async)");
-                } catch (Exception e) {
-                    System.err.println("[RateLimit] Erro ao salvar log no banco: " + e.getMessage());
-                }
-            });
+            String auditKey = ipAddress + ":" + (username != null ? username.toLowerCase().trim() : "");
+            long now = System.currentTimeMillis();
+            Long lastLog = lastLoggedTime.get(auditKey);
+            if (lastLog == null || (now - lastLog > 300_000)) {
+                lastLoggedTime.put(auditKey, now);
+                final String finalBlockReason = blockReason;
+                java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    try {
+                        logRepository.save(new RateLimitLog(ipAddress, username, finalBlockReason));
+                    } catch (Exception e) {
+                        log.error("Erro ao salvar log de rate limit: {}", e.getMessage());
+                    }
+                });
+            }
         }
 
         return blockReason == null;
@@ -153,7 +177,11 @@ public class RateLimitingService {
         }
 
         if (username != null && !username.isBlank()) {
-            Bucket userBucket = loginUserBuckets.get(username.toLowerCase().trim());
+            String userKey = (ipAddress != null ? ipAddress.trim() : "") + ":" + username.toLowerCase().trim();
+            Bucket userBucket = loginUserBuckets.get(userKey);
+            if (userBucket == null) {
+                userBucket = loginUserBuckets.get(username.toLowerCase().trim());
+            }
             if (userBucket != null && userBucket.getAvailableTokens() == 0) {
                 retryAfter = Math.max(retryAfter, 900);
             }
@@ -178,6 +206,10 @@ public class RateLimitingService {
             loginUserBuckets.remove(key);
             loginUserCreationTime.remove(key);
             usernameAttempts.remove(key);
+            if (ipAddress != null) {
+                loginUserBuckets.remove(ipAddress + ":" + key);
+                loginUserCreationTime.remove(ipAddress + ":" + key);
+            }
         }
     }
 
@@ -192,12 +224,26 @@ public class RateLimitingService {
             removed |= loginIpCreationTime.remove(ipAddress) != null;
             removed |= ipAttempts.remove(ipAddress) != null;
             removed |= blockedUntilMap.remove(ipAddress) != null;
+            for (String k : new java.util.ArrayList<>(loginUserBuckets.keySet())) {
+                if (k.startsWith(ipAddress + ":")) {
+                    loginUserBuckets.remove(k);
+                    loginUserCreationTime.remove(k);
+                    removed = true;
+                }
+            }
         }
         if (username != null && !username.isBlank()) {
             String key = username.toLowerCase().trim();
             removed |= loginUserBuckets.remove(key) != null;
             removed |= loginUserCreationTime.remove(key) != null;
             removed |= usernameAttempts.remove(key) != null;
+            for (String k : new java.util.ArrayList<>(loginUserBuckets.keySet())) {
+                if (k.endsWith(":" + key) || k.equals(key)) {
+                    loginUserBuckets.remove(k);
+                    loginUserCreationTime.remove(k);
+                    removed = true;
+                }
+            }
         }
 
         return removed;
@@ -302,6 +348,7 @@ public class RateLimitingService {
         loginIpCreationTime.clear();
         loginUserBuckets.clear();
         loginUserCreationTime.clear();
+        lastLoggedTime.clear();
         ipAttempts.clear();
         usernameAttempts.clear();
         blockedUntilMap.clear();
@@ -318,8 +365,9 @@ public class RateLimitingService {
         cleanupMap(buckets, bucketCreationTime, now);
         cleanupMap(loginIpBuckets, loginIpCreationTime, now);
         cleanupMap(loginUserBuckets, loginUserCreationTime, now);
+        lastLoggedTime.entrySet().removeIf(e -> now - e.getValue() > 300_000);
 
-        System.out.println("[RateLimit] Limpeza de memória executada. Buckets ativos: " + getActiveBucketsCount());
+        log.debug("[RateLimit] Limpeza de memória executada. Buckets ativos: {}", getActiveBucketsCount());
     }
 
     private <K> void cleanupMap(Map<K, Bucket> buckets, Map<K, Long> times, long now) {

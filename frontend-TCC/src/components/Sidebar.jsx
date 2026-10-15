@@ -17,6 +17,7 @@ import {
 import { useState } from 'react';
 import api from '../services/api';
 import { useToast } from './ToastProvider';
+import { usuarioEhAdmin } from '../utils/token';
 
 const ROUTE_MAP = {
   dashboard: '/dashboard',
@@ -106,6 +107,8 @@ export function Sidebar() {
     );
   };
 
+  const isAdmin = usuarioEhAdmin();
+
   return (
     <>
       <aside className="w-72 bg-white border-r border-slate-200 h-screen flex flex-col fixed left-0 top-0 overflow-y-auto">
@@ -113,9 +116,18 @@ export function Sidebar() {
           <h1 className="text-xl font-black text-slate-900 tracking-tight">
             Bazani <span className="text-blue-600">Mecânica</span>
           </h1>
-          <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-wider">
-            Gestão de Oficina
-          </p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+              Gestão de Oficina
+            </p>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+              isAdmin 
+                ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200'
+            }`}>
+              {isAdmin ? 'ADMIN' : 'OPERADOR'}
+            </span>
+          </div>
         </div>
 
         <div className="p-4 flex-1 flex flex-col gap-6">
@@ -128,14 +140,16 @@ export function Sidebar() {
             </div>
           </div>
 
-          <div>
-            <h3 className="px-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-              Financeiro
-            </h3>
-            <div className="space-y-1">
-              {menuFinanceiro.map(renderItem)}
+          {isAdmin && (
+            <div>
+              <h3 className="px-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Financeiro
+              </h3>
+              <div className="space-y-1">
+                {menuFinanceiro.map(renderItem)}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="p-4 border-t border-slate-100 space-y-1">

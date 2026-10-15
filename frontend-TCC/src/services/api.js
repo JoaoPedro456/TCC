@@ -21,15 +21,29 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Se o token expirar, redireciona para o login
+// Tratamento global de respostas de erro
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    // 401: Token expirado, ausente ou conta inativa -> Redireciona para login
+    if (error.response?.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/#/login';
       window.location.reload();
+      return Promise.reject(error);
     }
+
+    // 403: Acesso Negado (ex: Operador tentando ação restrita a Admin)
+    // NÃO remove o token nem desloga; formata mensagem amigável para exibição
+    if (error.response?.status === 403) {
+      if (!error.response.data || typeof error.response.data !== 'object') {
+        error.response.data = {};
+      }
+      if (!error.response.data.message && !error.response.data.erro && !error.response.data.error) {
+        error.response.data.message = 'Acesso negado: apenas Administradores têm permissão para realizar esta operação.';
+      }
+    }
+
     return Promise.reject(error);
   }
 );

@@ -49,6 +49,12 @@ public class LancamentoService {
     }
 
     public Lancamento criar(Lancamento lancamento) {
+        lancamento.setId(null);
+        lancamento.setAtivo(true);
+        lancamento.setStatus(StatusLancamento.PENDENTE);
+        lancamento.setValorPago(null);
+        lancamento.setDesconto(null);
+        lancamento.setDataPagamento(null);
         log.info("Novo lancamento criado: {} - R${}", lancamento.getDescricao(), lancamento.getValor());
         return repository.save(lancamento);
     }

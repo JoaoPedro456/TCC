@@ -14,9 +14,14 @@ target/
 .sts4-cache
 
 # Arquivos de configuração local com senhas
-application-dev.properties     ← ✅ IGNORA (tem senha)
-# application.properties       ← ✅ REMOVIDO (DEVE ser commitado!)
+# (o .gitignore NÃO aceita comentário na mesma linha do padrão)
+# application-dev.properties é versionado: ele só referencia variáveis de ambiente.
+# Coloque valores reais apenas em arquivos locais abaixo, que nunca são commitados.
+application-local.properties
+application-*-local.properties
 *.env
+.env
+.env.*
 
 ### IntelliJ IDEA ###
 .idea

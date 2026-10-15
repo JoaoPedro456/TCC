@@ -21,6 +21,12 @@ class PessoaServiceTest {
     @Mock
     private PessoaRepository repository;
 
+    @Mock
+    private com.tcc.backend_TCC.repository.OrdemServicoRepository ordemServicoRepository;
+
+    @Mock
+    private com.tcc.backend_TCC.repository.LancamentoRepository lancamentoRepository;
+
     @InjectMocks
     private PessoaService service;
 
@@ -87,7 +93,13 @@ class PessoaServiceTest {
 
     @Test
     void excluir_comSucesso_removePessoa() {
-        when(repository.existsById(1L)).thenReturn(true);
+        Pessoa p = new Pessoa();
+        p.setId(1L);
+        p.setNome("Cliente Teste");
+        when(repository.findById(1L)).thenReturn(Optional.of(p));
+        when(ordemServicoRepository.findByCliente(p)).thenReturn(java.util.Collections.emptyList());
+        when(lancamentoRepository.findByTipoOrderByVencimentoAsc(com.tcc.backend_TCC.enuns.TipoLancamento.RECEBER))
+                .thenReturn(java.util.Collections.emptyList());
 
         service.excluir(1L);
 
@@ -96,7 +108,7 @@ class PessoaServiceTest {
 
     @Test
     void excluir_pessoaNaoEncontrada_lancaExcecao() {
-        when(repository.existsById(999L)).thenReturn(false);
+        when(repository.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(ResponseStatusException.class, () -> service.excluir(999L));
     }

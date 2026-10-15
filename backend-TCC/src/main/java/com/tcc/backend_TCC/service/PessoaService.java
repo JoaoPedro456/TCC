@@ -58,6 +58,8 @@ public class PessoaService {
     }
 
     public Pessoa salvar(Pessoa p) {
+        p.setId(null);
+        p.setAtivo(true);
         normalizarDados(p);
         // Se for CPF, verifica se existe registro inativo e reativa/atualiza
         if (p.getCpf() != null && !p.getCpf().trim().isEmpty()) {

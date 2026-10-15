@@ -3,8 +3,10 @@ import { formatarMoeda } from '../utils/formatters';
 import api from '../services/api';
 import { Plus, Trash2, X, Search, PenIcon } from 'lucide-react'; // <-- PenIcon importado
 import { useToast } from '../components/ToastProvider.jsx';
+import { usuarioEhAdmin } from '../utils/token';
 
 export function ServicoPage() {
+  const isAdmin = usuarioEhAdmin();
   const [servicos, setServicos] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [idEdicao, setIdEdicao] = useState(null); 
@@ -158,12 +160,15 @@ export function ServicoPage() {
               >
                 <PenIcon size={16} />
               </button>
-              <button
-                onClick={() => handleExcluir(s.id)}
-                className="text-slate-300 hover:text-red-500 transition p-2 rounded-lg hover:bg-red-50"
-              >
-                <Trash2 size={16} />
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => handleExcluir(s.id)}
+                  className="text-slate-300 hover:text-red-500 transition p-2 rounded-lg hover:bg-red-50"
+                  title="Excluir serviço"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
           </div>
         ))}
